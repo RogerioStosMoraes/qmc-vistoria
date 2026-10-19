@@ -4,7 +4,7 @@
 export const CONFIG = {
   // "ID do aplicativo (cliente)" do registro no Microsoft Entra (portal.azure.com).
   // Enquanto estiver como COLE_AQUI..., o app funciona em modo local (sem login/OneDrive).
-  clientId: 'COLE_AQUI_O_CLIENT_ID',
+  clientId: '68761df4-e86e-434d-96d1-c52ed6760781',
 
   // "common" aceita conta pessoal (Outlook/Hotmail/365 Pessoal) e contas corporativas.
   authority: 'https://login.microsoftonline.com/common',
