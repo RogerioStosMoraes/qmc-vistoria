@@ -1,4 +1,4 @@
-import { STATUS, STATUS_ORDER, YN, expandAll, scoreGroup, hasContent, needsPhoto, normAnswer, instTitle, OPERADORAS, uid, fmtDate, fmtTime, pad } from './model.js';
+import { STATUS, STATUS_ORDER, YN, expandAll, scoreGroup, hasContent, needsPhoto, normAnswer, instTitle, baseName, OPERADORAS, uid, fmtDate, fmtTime, pad } from './model.js';
 import * as db from './db.js';
 import * as cloud from './cloud.js';
 import { buildPptx } from './pptx-builder.js';
@@ -408,8 +408,7 @@ async function generate() {
     let coverBytes = null;
     if (V.cover) { const rec = await db.getPhoto(V.cover.id); if (rec?.blob) coverBytes = new Uint8Array(await rec.blob.arrayBuffer()); }
     const bytes = await buildPptx({ JSZip: window.JSZip, template: tpl, vistoria: V, checklist, photoBytes, logos, coverBytes });
-    const safe = (V.header.siteId || 'vistoria').replace(/[^\w.-]+/g, '_');
-    const name = `Vistoria_${safe}_${V.startAt.slice(0, 10).replace(/-/g, '')}.pptx`;
+    const name = `${baseName(V)} - Vistoria ${V.startAt.slice(0, 10).replace(/-/g, '')}.pptx`;
     const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
     lastPptx = { blob, bytes, name };
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();

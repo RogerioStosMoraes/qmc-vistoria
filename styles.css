@@ -93,11 +93,14 @@ input:focus, textarea:focus { outline: 2px solid var(--orange); outline-offset: 
 .seg { display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; }
 .seg.yn { grid-template-columns: repeat(2, 1fr); max-width: 260px; }
 .seg button { border: 1.5px solid var(--line); background: #fff; border-radius: 10px; padding: 10px 4px; font-weight: 650; font-size: 14.5px; min-height: 46px; cursor: pointer; }
-.seg button.on[data-val=ok] { background: var(--ok-bg); border-color: var(--ok); color: var(--ok); }
-.seg button.on[data-val=na] { background: var(--na-bg); border-color: var(--na); color: var(--na); }
-.seg button.on[data-val=nok] { background: var(--nok-bg); border-color: var(--nok); color: var(--nok); }
-.seg button.on[data-val=sim] { background: #FFE9D2; border-color: var(--orange); color: #9A4A00; }
-.seg button.on[data-val=nao] { background: var(--na-bg); border-color: var(--na); color: var(--na); }
+.seg button { position: relative; }
+.seg button.on { color: #fff; border-color: transparent; box-shadow: 0 2px 6px rgba(0,0,0,.25); }
+.seg button.on::before { content: "✓ "; }
+.seg button.on[data-v=ok] { background: #1E8A43; }
+.seg button.on[data-v=nok] { background: #C62828; }
+.seg button.on[data-v=na] { background: #6D6E71; }
+.seg button.on[data-v=sim] { background: var(--orange); }
+.seg button.on[data-v=nao] { background: #6D6E71; }
 .sub-q { margin-top: 10px; padding-left: 12px; border-left: 3px solid var(--line); }
 .sub-q .q { font-weight: 500; font-size: 14.5px; }
 

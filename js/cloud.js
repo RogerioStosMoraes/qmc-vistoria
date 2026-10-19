@@ -1,6 +1,6 @@
 // Login Microsoft (MSAL) + sincronização com o OneDrive do próprio usuário (Microsoft Graph)
 import { CONFIG } from '../config.js';
-import { slug } from './model.js';
+import { baseName } from './model.js';
 import * as db from './db.js';
 
 let pca = null;
@@ -98,12 +98,26 @@ async function putFile(parts, body, contentType) {
 }
 
 export function remoteFolderOf(v) {
-  if (!v.remote) {
-    const d = new Date(v.createdAt);
-    const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-    v.remote = `${slug(v.header?.siteId) || 'sem-id'}_${ymd}_${v.id.slice(0, 8)}`;
-  }
+  const d = new Date(v.createdAt);
+  const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
+  if (!v.remote) v.remote = `${baseName(v)} - ${ymd} - ${v.id.slice(0, 6)}`;
+  v.remoteDesired = `${baseName(v)} - ${ymd} - ${v.id.slice(0, 6)}`;
   return v.remote;
+}
+
+/** Se ID do site / empreendimento mudaram, renomeia a pasta no OneDrive. */
+async function renameIfNeeded(v) {
+  remoteFolderOf(v);
+  const want = v.remoteDesired; delete v.remoteDesired;
+  if (want && want !== v.remote) {
+    try {
+      await gfetch(pathOf(v.remote), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: want }) });
+      v.remote = want;
+    } catch (e) {
+      if (e.status === 404) v.remote = want; // ainda não existia no OneDrive
+      else console.warn('Renomear pasta', e);
+    }
+  }
 }
 
 const photoIds = (v) => {
@@ -115,7 +129,8 @@ const photoIds = (v) => {
 
 /** Envia a vistoria (fotos novas + JSON). */
 export async function push(v) {
-  const folder = remoteFolderOf(v);
+  await renameIfNeeded(v);
+  const folder = v.remote;
   for (const id of photoIds(v)) {
     const rec = await db.getPhoto(id);
     if (rec && !rec.synced && rec.blob) {

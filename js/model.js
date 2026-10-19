@@ -99,3 +99,10 @@ export function needsPhoto(def, inst) {
   if (inst.na) return false;
   return scoreGroup(def, inst).nok > 0 && !(inst.photos || []).length;
 }
+
+/** Nome base "ID do site - Empreendimento" seguro para arquivo/pasta. */
+export function baseName(v) {
+  const clean = (x) => String(x || '').replace(/[\\/:*?"<>|#%~]+/g, ' ').replace(/\s+/g, ' ').trim();
+  const parts = [clean(v.header?.siteId), clean(v.header?.empreendimento)].filter(Boolean);
+  return (parts.join(' - ') || 'Vistoria').slice(0, 90).trim();
+}
