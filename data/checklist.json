@@ -1,0 +1,808 @@
+{
+ "meta": {
+  "origem": "Check List para As-built e HOF 11-02.xlsx",
+  "resposta_padrao": [
+   "OK",
+   "Bom",
+   "N/A"
+  ],
+  "observacao_por_grupo": true,
+  "fotos": {
+   "observacao_individual": true,
+   "max_por_slide_pptx": 2
+  },
+  "percentual_por_grupo": "calculado pelo app (substitui a coluna 'Métricas/Porcentagem' do xlsx, que estava vazia)"
+ },
+ "cabecalho_manual": [
+  "ID do Site",
+  "Empreendimento",
+  "Número do projeto",
+  "Empresa implantadora",
+  "Operadora"
+ ],
+ "cabecalho_automatico": [
+  "Data/hora início",
+  "Data/hora fim",
+  "GPS",
+  "Imagem do empreendimento"
+ ],
+ "blocos_reutilizaveis": {
+  "quadro_comum": [
+   {
+    "item": "Montagem geral"
+   },
+   {
+    "item": "Entrada de cabos com espuma"
+   },
+   {
+    "item": "Cabos com anilhas"
+   },
+   {
+    "item": "Conectores em todos os cabos"
+   },
+   {
+    "item": "Diagrama unifilar na porta"
+   },
+   {
+    "item": "Aterramento da porta"
+   },
+   {
+    "item": "Identificação do quadro"
+   },
+   {
+    "item": "Disjuntores com valor conforme projeto"
+   },
+   {
+    "item": "Identificação dos disjuntores"
+   },
+   {
+    "item": "Silicone nas juntas de acessórios dos eletrodutos"
+   },
+   {
+    "item": "Barra de aterramento com cabos conectados corretamente"
+   },
+   {
+    "item": "Barra de neutro com cabos conectados corretamente"
+   },
+   {
+    "item": "Telhado de cobertura (pingadeira)"
+   }
+  ],
+  "gabinete_comum": [
+   {
+    "item": "Identificação do gabinete",
+    "anexo_obrigatorio_se": "Se houve modificação no ByFace, anexar print do e-mail de conformidade da engenharia QMC",
+    "pergunta_extra": "Teve modificação no ByFace?"
+   },
+   {
+    "item": "Aterramento"
+   },
+   {
+    "item": "Montagem de equipos conforme ByFace"
+   },
+   {
+    "item": "FAN do gabinete"
+   },
+   {
+    "item": "Arrumação de cabos"
+   },
+   {
+    "item": "Identificação de cabos de RF (in e out)"
+   },
+   {
+    "item": "Portas de RF conforme projeto"
+   },
+   {
+    "item": "Identificação das réguas de tomadas e cabos"
+   }
+  ],
+  "estrutura_hbts": [
+   {
+    "item": "Grade"
+   },
+   {
+    "item": "Porta da grade"
+   },
+   {
+    "item": "Bases de concreto"
+   },
+   {
+    "item": "Pintura das bases"
+   },
+   {
+    "item": "Iluminação"
+   }
+  ]
+ },
+ "grupos": [
+  {
+   "id": "acesso",
+   "grupo": "Acesso e segurança",
+   "instancias": "única",
+   "itens": [
+    {
+     "item": "Placa identificatória"
+    },
+    {
+     "item": "Porta de acesso"
+    },
+    {
+     "item": "Cadeado Bluetooth na porta principal do HBTS"
+    },
+    {
+     "item": "Cadeado com senha na entrada secundária / sala QMC"
+    },
+    {
+     "item": "Sensor de porta aberta",
+     "anexo_obrigatorio_se": "Checar LPU e PPE; se não constar em escopo, anexar print de conformidade"
+    },
+    {
+     "item": "Sensor de fumaça",
+     "anexo_obrigatorio_se": "Checar LPU e PPE; se não constar em escopo, anexar print de conformidade"
+    },
+    {
+     "item": "Câmera de segurança",
+     "anexo_obrigatorio_se": "Checar LPU e PPE; se não constar em escopo, anexar print de conformidade"
+    }
+   ]
+  },
+  {
+   "id": "hbts_qmc",
+   "grupo": "HBTS QMC (sala)",
+   "instancias": "única",
+   "usa_bloco": "estrutura_hbts",
+   "itens": [
+    {
+     "item": "Pintura da sala"
+    },
+    {
+     "item": "Armário O&M"
+    },
+    {
+     "item": "Claviculário"
+    },
+    {
+     "item": "Escada, vassoura, pá, cadeiras"
+    },
+    {
+     "item": "Gabinetes fixos e identificados"
+    },
+    {
+     "item": "Ar-condicionado"
+    },
+    {
+     "item": "Dreno do ar-condicionado"
+    },
+    {
+     "item": "PLC"
+    },
+    {
+     "item": "Fonte do PLC"
+    },
+    {
+     "item": "Eletrocalhas"
+    },
+    {
+     "item": "Esteiras superiores"
+    },
+    {
+     "item": "Infra de entrada de cabos de RF/energia para os gabinetes"
+    },
+    {
+     "item": "Esteira debaixo dos gabinetes"
+    },
+    {
+     "item": "Eletrodutos para quadros"
+    },
+    {
+     "item": "Silicone nas juntas de eletrodutos e acessórios"
+    }
+   ]
+  },
+  {
+   "id": "hbts_op",
+   "grupo": "HBTS Operadora",
+   "instancias": "1 por operadora (nome)",
+   "usa_bloco": "estrutura_hbts",
+   "itens": [
+    {
+     "item": "Esteira horizontal"
+    },
+    {
+     "item": "Esteira vertical (para RRUs)"
+    },
+    {
+     "item": "Eletrocalha horizontal"
+    },
+    {
+     "item": "Eletroduto vertical (QDCA e bases para gabinetes)"
+    },
+    {
+     "item": "SKID"
+    },
+    {
+     "item": "Silicone nas juntas dos eletrodutos"
+    },
+    {
+     "item": "Rota de MW"
+    },
+    {
+     "item": "Rota de Tx"
+    },
+    {
+     "item": "Racks para RRU"
+    },
+    {
+     "item": "Cabos de energia prontos para os gabinetes"
+    },
+    {
+     "item": "Cabos de RF vindos da sala identificados e protegidos"
+    }
+   ]
+  },
+  {
+   "id": "qdg",
+   "grupo": "Quadro QDG-QMC",
+   "instancias": "única",
+   "usa_bloco": "quadro_comum",
+   "itens": [
+    {
+     "item": "Medidor funcionando"
+    },
+    {
+     "item": "Conectado à telemetria"
+    }
+   ],
+   "campos": [
+    {
+     "campo": "Amperagem do DJG",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ QDCA QMC",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ QDCA CLARO",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ QDCA VIVO",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ QDCA TIM",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Reserva",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Tomada",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Iluminação",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ PLC",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Fielloger/Smart Node",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    }
+   ]
+  },
+  {
+   "id": "qdca_qmc",
+   "grupo": "Quadro QDCA-QMC",
+   "instancias": "única",
+   "usa_bloco": "quadro_comum",
+   "itens": [
+    {
+     "item": "Medidor funcionando"
+    },
+    {
+     "item": "Conectado à telemetria"
+    },
+    {
+     "item": "Medidor do ar-condicionado conectado corretamente"
+    }
+   ],
+   "campos": [
+    {
+     "campo": "Amperagem do DJG",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Rack 1",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Rack 2",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Rack 3",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ QDN 1",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ QDN 2",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Reserva",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Tomada",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Iluminação",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ PLC",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Fielloger/Smart Node",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    }
+   ]
+  },
+  {
+   "id": "qdca_op",
+   "grupo": "Quadro QDCA Operadora",
+   "instancias": "1 por operadora",
+   "usa_bloco": "quadro_comum",
+   "itens": [
+    {
+     "item": "Medidor funcionando"
+    },
+    {
+     "item": "Conectado à telemetria"
+    }
+   ],
+   "campos": [
+    {
+     "campo": "Amperagem do DJG",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Gabinete 1",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Gabinete 2",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Gabinete 3",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Reserva",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Tomada",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Iluminação",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    }
+   ]
+  },
+  {
+   "id": "qdn",
+   "grupo": "Quadro QDN-QMC",
+   "instancias": "única",
+   "usa_bloco": "quadro_comum",
+   "itens": [],
+   "campos": [
+    {
+     "campo": "Amperagem do DJG",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJs IDFs/Nodes",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    }
+   ]
+  },
+  {
+   "id": "miniqdca",
+   "grupo": "miniQDCA",
+   "instancias": "1 por IDF/Node (referenciado no grupo IDF)",
+   "usa_bloco": "quadro_comum",
+   "itens": [],
+   "campos": [
+    {
+     "campo": "Amperagem do DJG",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJs IDFs/Nodes",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    }
+   ]
+  },
+  {
+   "id": "dj_se",
+   "grupo": "Disjuntor S.E.",
+   "instancias": "única",
+   "itens": [
+    {
+     "item": "Montagem geral"
+    }
+   ],
+   "campos": [
+    {
+     "campo": "Amperagem do DJ",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    }
+   ]
+  },
+  {
+   "id": "medicoes",
+   "grupo": "Medições elétricas",
+   "instancias": "única",
+   "tipo": "medicao",
+   "itens": [],
+   "campos": [
+    {
+     "campo": "Voltagem (multímetro, bornes de entrada e barramentos) – com EPI",
+     "tipo": "numero_V"
+    },
+    {
+     "campo": "Corrente (alicate amperímetro, cabos de entrada) – com EPI",
+     "tipo": "numero_A"
+    }
+   ]
+  },
+  {
+   "id": "aterramento",
+   "grupo": "Aterramento geral",
+   "instancias": "única",
+   "itens": [
+    {
+     "item": "Montagem dos FCC"
+    },
+    {
+     "item": "Montagem dos FCI"
+    },
+    {
+     "item": "Barra de aterramento FCC"
+    },
+    {
+     "item": "Aterramento de racks e skid (FCI)"
+    },
+    {
+     "item": "Conexão à malha de aterramento do empreendimento"
+    }
+   ]
+  },
+  {
+   "id": "gab_poi",
+   "grupo": "Gabinete POI",
+   "instancias": "1 por gabinete",
+   "usa_bloco": "gabinete_comum",
+   "itens": [
+    {
+     "item": "Identificação de subracks POI"
+    },
+    {
+     "item": "Identificação de card-POI"
+    },
+    {
+     "item": "Proteção de fábrica nas portas não utilizadas do POI"
+    },
+    {
+     "item": "FAN dos subracks POI funcionando"
+    }
+   ]
+  },
+  {
+   "id": "gab_ftta",
+   "grupo": "Gabinete FTTA",
+   "instancias": "1 por gabinete",
+   "usa_bloco": "gabinete_comum",
+   "itens": [
+    {
+     "item": "Identificação de AUs"
+    },
+    {
+     "item": "Identificação de cordões óticos"
+    },
+    {
+     "item": "Proteção de fábrica nas portas não utilizadas dos módulos AU"
+    },
+    {
+     "item": "FAN das AUs funcionando"
+    }
+   ]
+  },
+  {
+   "id": "gab_5g",
+   "grupo": "Gabinete 5G-3500",
+   "instancias": "1 por gabinete",
+   "usa_bloco": "gabinete_comum",
+   "itens": [
+    {
+     "item": "Identificação de subracks POI"
+    },
+    {
+     "item": "Identificação de card-POI"
+    },
+    {
+     "item": "Proteção de fábrica nas portas não utilizadas do POI"
+    },
+    {
+     "item": "FAN dos subracks POI funcionando"
+    },
+    {
+     "item": "Identificação de AUs"
+    },
+    {
+     "item": "Identificação de cordões óticos"
+    },
+    {
+     "item": "Proteção de fábrica nas portas não utilizadas dos módulos AU"
+    },
+    {
+     "item": "FAN das AUs funcionando"
+    }
+   ]
+  },
+  {
+   "id": "gerenc",
+   "grupo": "Gerenciamento remoto",
+   "instancias": "única",
+   "itens": [
+    {
+     "item": "PFSense"
+    },
+    {
+     "item": "Switch 16 portas"
+    },
+    {
+     "item": "Modem Wi-Fi"
+    },
+    {
+     "item": "PLC Conflex"
+    },
+    {
+     "item": "Medidores Kron"
+    }
+   ]
+  },
+  {
+   "id": "idf",
+   "grupo": "IDF / Nodes",
+   "instancias": "1 por IDF/Node",
+   "itens": [
+    {
+     "item": "miniGabinete identificado",
+     "anexo_obrigatorio_se": "Se houve modificação no ByFace, anexar print do e-mail de conformidade da engenharia QMC",
+     "pergunta_extra": "Teve modificação no ByFace?"
+    },
+    {
+     "item": "Canalização arrumada"
+    },
+    {
+     "item": "Canalização identificada"
+    },
+    {
+     "item": "miniQDCA instalado conforme projeto"
+    },
+    {
+     "item": "Conectores dos cabos elétricos corretamente feitos"
+    },
+    {
+     "item": "miniDIO montado conforme projeto"
+    },
+    {
+     "item": "Proteção das fibras entrando e saindo do miniDIO"
+    },
+    {
+     "item": "Identificação do miniDIO e portas óticas"
+    },
+    {
+     "item": "Montagem do IDF conforme projeto"
+    },
+    {
+     "item": "Arrumação dos cabos óticos e elétricos"
+    },
+    {
+     "item": "Identificação das EU"
+    },
+    {
+     "item": "PSU ok, sem alarmes"
+    },
+    {
+     "item": "Portas óticas do DGO identificadas"
+    },
+    {
+     "item": "Identificação dos cordões óticos da EU"
+    },
+    {
+     "item": "Identificação dos cabos elétricos da PSU"
+    },
+    {
+     "item": "Remotas instaladas conforme projeto"
+    },
+    {
+     "item": "Jumper ótico entre miniDIO e 1ª remota protegido"
+    },
+    {
+     "item": "Cascata ótica entre remotas"
+    },
+    {
+     "item": "Remotas sem alarmes"
+    },
+    {
+     "item": "Energia para remotas instalada corretamente"
+    },
+    {
+     "item": "Identificação dos jumpers óticos entre miniDIO e remotas"
+    },
+    {
+     "item": "Cabos de RF entre remotas e pentaplexer nas portas corretas"
+    },
+    {
+     "item": "Cabos de RF identificados"
+    },
+    {
+     "item": "Cargas instaladas nas portas vagas dos pentaplexer"
+    },
+    {
+     "item": "Grade de proteção identificada e com cadeado de senha padrão"
+    },
+    {
+     "item": "Remotas identificadas"
+    }
+   ],
+   "campos": [
+    {
+     "campo": "Amperagem do DJG",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Remota 1",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Remota 2",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Remota 3",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Régua 1",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Régua 2",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Tomada",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "campo": "Amperagem DJ Reserva",
+     "tipo": "numero_A",
+     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
+    }
+   ]
+  },
+  {
+   "id": "n3ru",
+   "grupo": "N3RU",
+   "instancias": "1 por N3RU",
+   "itens": [
+    {
+     "item": "Montagem feita no padrão"
+    },
+    {
+     "item": "Limpeza da antena"
+    },
+    {
+     "item": "CTO fusionado e fixo"
+    },
+    {
+     "item": "Cabo de aço fixo em outra estrutura (comp. máx. 1 m)"
+    },
+    {
+     "item": "Alimentação conectada, split 1/2 de energia"
+    },
+    {
+     "item": "Cabo híbrido EL crimpado com conector pino nas pontas"
+    },
+    {
+     "item": "Cordão ótico de backup"
+    }
+   ]
+  },
+  {
+   "id": "cabos_ativos",
+   "grupo": "Instalação de cabos e ativos QMC",
+   "instancias": "única",
+   "itens": [
+    {
+     "item": "Antenas passivas instaladas nos pontos do projeto",
+     "anexo_obrigatorio_se": "Se NÃO, indicar motivo da mudança e anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "item": "N3RU instaladas nos pontos do projeto",
+     "anexo_obrigatorio_se": "Se NÃO, indicar motivo da mudança e anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "item": "Antenas passivas instaladas nas lojas indicadas no projeto",
+     "anexo_obrigatorio_se": "Se NÃO, indicar motivo da mudança e anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "item": "N3RU instaladas nas lojas indicadas no projeto",
+     "anexo_obrigatorio_se": "Se NÃO, indicar motivo da mudança e anexar print de conformidade da engenharia QMC"
+    },
+    {
+     "item": "Mudança de encaminhamento de cabo coaxial/híbrido/fibra que aumente a metragem do trecho?",
+     "anexo_obrigatorio_se": "Se sim, anexar print do e-mail de conformidade da engenharia QMC",
+     "pergunta_extra": true
+    }
+   ]
+  }
+ ]
+}
