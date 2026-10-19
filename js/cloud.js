@@ -33,7 +33,14 @@ export async function initAuth() {
   return account;
 }
 
-export function signIn() { return pca.loginRedirect({ scopes: CONFIG.scopes, prompt: 'select_account' }); }
+export async function signIn() {
+  if (!pca) {
+    if (!window.msal) throw new Error('Biblioteca de login não carregou (vendor/msal-browser.min.js). Recarregue a página com Ctrl+F5.');
+    await initAuth();
+    if (!pca) throw new Error('Login não inicializado (confira o clientId em config.js).');
+  }
+  return pca.loginRedirect({ scopes: CONFIG.scopes, prompt: 'select_account' });
+}
 export function signOut() { return pca.logoutRedirect({ account }); }
 
 let testToken = null;

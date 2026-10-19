@@ -470,7 +470,7 @@ view.addEventListener('click', async (e) => {
       break;
     }
     case 'install': deferredInstall?.prompt(); deferredInstall = null; route(); break;
-    case 'login': cloud.signIn(); break;
+    case 'login': toast('Abrindo login da Microsoft…', 4000); cloud.signIn().catch((e) => toast('Erro no login: ' + (e.errorCode ? e.errorCode + ' – ' : '') + (e.message || e), 12000)); break;
     case 'logout': if (confirm('Sair da conta Microsoft? As vistorias continuam no aparelho.')) cloud.signOut(); break;
     case 'sync': doSync(true); break;
     case 'gps': { toast('Obtendo localização…', 1500); const g = await getGPS(); if (g) { V.gps = g; touch(); refreshOverviewBits(); toast('Localização atualizada'); } else toast('Não foi possível obter a localização'); break; }
