@@ -422,7 +422,7 @@ async function generate() {
 }
 
 // ---------- eventos ----------
-view.addEventListener('click', async (e) => {
+async function onClick(e) {
   const t = e.target;
   // checklist segmentado
   const sb = t.closest('.seg button');
@@ -493,7 +493,9 @@ view.addEventListener('click', async (e) => {
       if (lastPptx) { try { toast('Enviando…', 1500); await cloud.savePptx(V, lastPptx.bytes, lastPptx.name); toast('PPTX salvo no OneDrive'); } catch (err) { toast('Falha: ' + err.message, 5000); } }
       break;
   }
-});
+}
+view.addEventListener('click', onClick);
+$('#top').addEventListener('click', onClick);
 
 view.addEventListener('input', (e) => {
   const t = e.target;
