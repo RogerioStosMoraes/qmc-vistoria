@@ -1,6 +1,7 @@
 // Gera o relatório .pptx a partir do modelo QMC (template.pptx enxuto, sem slides).
 // Funciona no navegador e no Node (JSZip é injetado).
-import { STATUS, YN, normAnswer, expandGroup, scoreGroup, hasContent, instTitle, OPERADORAS, fmtDate, fmtTime } from './model.js';
+import { STATUS, YN, normAnswer, expandGroup, scoreGroup, hasContent, instTitle, OPERADORAS, fmtDate, fmtTime,
+  tipoOf, versaoLabel, ETAPAS, expandAcomp, groupCalc, overallCalc, fmtPct, deltaLabel } from './model.js';
 
 const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
@@ -174,12 +175,20 @@ function headerStrip(s, def, inst, sc) {
   textBox(s, { x: FRAME.x + 100000, y: FRAME.y + 40000, w: FRAME.w - 200000, h: 260000, paras: [para(t)], name: 'Resumo', anchor: 'ctr' });
 }
 
-function obsBox(s, text) {
+function obsBox(s, text, { y = 4740000, h = 700000, big = false } = {}) {
   const lines = String(text || '').trim() ? String(text).trim().split(/\r?\n/) : ['—'];
-  const paras = [para([run('Observação:', { sz: 1100, color: TEAL, font: FONT_XB })], { spcAft: 100 })];
-  const sz = text && text.length > 420 ? 800 : 900;
+  const paras = [para([run('Observação:', { sz: big ? 1400 : 1100, color: TEAL, font: FONT_XB })], { spcAft: 100 })];
+  const len = String(text || '').length;
+  const sz = big ? (len > 900 ? 1000 : len > 500 ? 1100 : 1200) : (len > 420 ? 800 : 900);
   for (const l of lines) paras.push(para([run(l, { sz, b: true, color: GREY, font: FONT })]));
-  textBox(s, { x: FRAME.x + 100000, y: 4740000, w: FRAME.w - 200000, h: 700000, paras, name: 'Observação do grupo' });
+  textBox(s, { x: FRAME.x + 100000, y, w: FRAME.w - 200000, h, paras, name: 'Observação do grupo' });
+}
+function rectShape(s, { x, y, w, h, fill, alpha, line, lineAlpha, round = 0, name = 'Forma' }) {
+  const id = s.id();
+  const f = fill ? `<a:solidFill><a:srgbClr val="${fill}">${alpha != null ? `<a:alpha val="${alpha}"/>` : ''}</a:srgbClr></a:solidFill>` : '<a:noFill/>';
+  const ln = line ? `<a:ln w="9525"><a:solidFill><a:srgbClr val="${line}">${lineAlpha != null ? `<a:alpha val="${lineAlpha}"/>` : ''}</a:srgbClr></a:solidFill></a:ln>` : '<a:ln><a:noFill/></a:ln>';
+  const geom = round ? `<a:prstGeom prst="roundRect"><a:avLst><a:gd name="adj" fmla="val ${round}"/></a:avLst></a:prstGeom>` : '<a:prstGeom prst="rect"><a:avLst/></a:prstGeom>';
+  s.shapes.push(`<p:sp><p:nvSpPr><p:cNvPr id="${id}" name="${esc(name)} ${id}"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="${Math.round(x)}" y="${Math.round(y)}"/><a:ext cx="${Math.round(w)}" cy="${Math.round(h)}"/></a:xfrm>${geom}${f}${ln}</p:spPr><p:txBody><a:bodyPr rtlCol="0" anchor="ctr"/><a:lstStyle/><a:p><a:endParaRPr lang="pt-BR"/></a:p></p:txBody></p:sp>`);
 }
 
 function checklistSlides(def, inst) {
@@ -276,14 +285,15 @@ function coverSlide(v, ctx) {
   const gid = s.id();
   s.shapes.push(`<p:sp><p:nvSpPr><p:cNvPr id="${gid}" name="Overlay Gradiente Capa"/><p:cNvSpPr/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="6249987" cy="5670550"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom><a:gradFill rotWithShape="1"><a:gsLst><a:gs pos="0"><a:srgbClr val="051024"><a:alpha val="78000"/></a:srgbClr></a:gs><a:gs pos="100000"><a:srgbClr val="051024"><a:alpha val="0"/></a:srgbClr></a:gs></a:gsLst><a:lin ang="0" scaled="0"/></a:gradFill><a:ln><a:noFill/></a:ln><a:effectLst/></p:spPr><p:txBody><a:bodyPr rtlCol="0" anchor="ctr"/><a:lstStyle/><a:p><a:pPr algn="ctr"/><a:endParaRPr lang="pt-BR"/></a:p></p:txBody></p:sp>`);
 
+  const ac = tipoOf(v) === 'acomp';
   const name = (h.empreendimento || '').trim() || 'Empreendimento';
-  const title = `Vistoria – ${name}`;
+  const title = ac ? `Acompanhamento – ${name}` : `Vistoria – ${name}`;
   const tsz = title.length <= 28 ? 2600 : title.length <= 40 ? 2200 : 1800;
   const l2 = [];
   if (h.siteId) l2.push(h.siteId);
   const proj = [h.projeto && `Projeto ${h.projeto}`, h.implantadora].filter(Boolean).join(' · ');
   if (proj) l2.push(proj);
-  const when = [fmtDate(v.startAt), v.startAt && v.endAt ? `${fmtTime(v.startAt)} – ${fmtTime(v.endAt)}` : fmtTime(v.startAt)].filter(Boolean).join(' · ');
+  const when = [ac ? versaoLabel(v) : '', fmtDate(v.startAt), v.startAt && v.endAt ? `${fmtTime(v.startAt)} – ${fmtTime(v.endAt)}` : fmtTime(v.startAt)].filter(Boolean).join(' · ');
   if (when) l2.push(when);
   const tid = s.id();
   const sub = [];
@@ -315,6 +325,19 @@ function coverSlide(v, ctx) {
     textBox(s, { x: px, y: y0, w: plateW, h: plateH, paras: [para([run(h.outraOperadora.trim(), { sz: 1400, b: true, color: '1A1A1A', font: FONT })], { algn: 'ctr' })], name: 'Outra operadora', anchor: 'ctr' });
   }
 
+  // quantidades de projeto (acompanhamento)
+  if (ac) {
+    textBox(s, { x: 554854, y: 3380000, w: 5200000, h: 240000, paras: [para([run('Quantidades de projeto', { sz: 1100, b: true, color: 'FFFFFF', font: FONT })])], name: 'Legenda quantidades', anchor: 'ctr' });
+    const qs = [['Setores', h.qtdSetores], ['IDFs', h.qtdIdfs], ['Nanos', h.qtdNanos]];
+    const bw = 1650000, bh = 900000, bg = 150000;
+    qs.forEach(([lab, val], i) => {
+      const bx = 554854 + i * (bw + bg), by = 3650000;
+      rectShape(s, { x: bx, y: by, w: bw, h: bh, fill: 'FFFFFF', alpha: 16000, line: 'FFFFFF', lineAlpha: 45000, round: 12000, name: 'Qtd ' + lab });
+      textBox(s, { x: bx, y: by + 40000, w: bw, h: 560000, paras: [para([run(String(val ?? '').trim() || '—', { sz: 3200, b: true, color: 'F58220', font: FONT_XB })], { algn: 'ctr' })], name: 'Valor ' + lab, anchor: 'ctr' });
+      textBox(s, { x: bx, y: by + 590000, w: bw, h: 270000, paras: [para([run(lab, { sz: 1100, color: 'FFFFFF', font: FONT })], { algn: 'ctr' })], name: 'Rótulo ' + lab, anchor: 'ctr' });
+    });
+  }
+
   // GPS (link para o mapa)
   if (v.gps && v.gps.lat != null) {
     const rid = s.rel(`${REL}/hyperlink`, `https://www.google.com/maps?q=${v.gps.lat},${v.gps.lon}`, true);
@@ -324,10 +347,98 @@ function coverSlide(v, ctx) {
   return s;
 }
 
+// ---------- acompanhamento ----------
+const lvl = (p) => (p >= 100 ? { fill: 'DDF1E3', color: '1E6B34' } : p > 0 ? { fill: 'FDE9D2', color: '9A4A00' } : { fill: 'FBDADA', color: 'B3261E' });
+
+function conclusionSlide(v, defMap) {
+  const s = new Slide(13);
+  const o = overallCalc(v, defMap);
+  titleShape(s, 'Conclusão – Avanço geral');
+  frameShapes(s);
+  const x0 = FRAME.x + 100000;
+  // painel do avanço geral
+  rectShape(s, { x: x0, y: 1000000, w: 2900000, h: 2500000, fill: 'F3F7F9', line: 'D6E4EA', round: 6000, name: 'Painel avanço' });
+  textBox(s, { x: x0, y: 1060000, w: 2900000, h: 280000, paras: [para([run('AVANÇO GERAL', { sz: 1200, b: true, color: TEAL, font: FONT_XB })], { algn: 'ctr' })], name: 'Rótulo avanço', anchor: 'ctr' });
+  textBox(s, { x: x0, y: 1330000, w: 2900000, h: 1100000, paras: [para([run(fmtPct(o.pct), { sz: 6000, b: true, color: TEAL, font: FONT_XB })], { algn: 'ctr' })], name: 'Valor avanço', anchor: 'ctr' });
+  const sub = [];
+  if (v.prev) {
+    const d = o.pct != null && v.prev.pct != null ? o.pct - v.prev.pct : null;
+    sub.push(para([run(`${versaoLabel(v.prev)}: ${fmtPct(v.prev.pct)}`, { sz: 1200, color: GREY, font: FONT })], { algn: 'ctr' }));
+    if (d != null) sub.push(para([run(deltaLabel(o.pct, v.prev.pct), { sz: 1500, b: true, color: d > 0 ? '1E6B34' : d < 0 ? 'B3261E' : GREY, font: FONT })], { algn: 'ctr' }));
+  } else {
+    sub.push(para([run('média do avanço dos grupos', { sz: 1000, color: '6D6E71', font: FONT })], { algn: 'ctr' }));
+  }
+  sub.push(para([run(`${versaoLabel(v)} · ${fmtDate(v.endAt || v.startAt)}`, { sz: 1000, color: '6D6E71', font: FONT })], { algn: 'ctr', spcBef: 300 }));
+  textBox(s, { x: x0, y: 2450000, w: 2900000, h: 1000000, paras: sub, name: 'Comparação', anchor: 't' });
+
+  // barras por grupo
+  const bx = x0 + 3200000, bw = 5900000;
+  const groups = o.groups.filter((g) => hasContent(g.d, g.g));
+  const step = Math.min(850000, 2500000 / Math.max(1, groups.length));
+  groups.forEach((g, i) => {
+    const y = 1000000 + i * step;
+    const pg = v.prev?.groups?.[g.d.id];
+    const head = [run(g.d.grupo, { sz: 1300, b: true, color: GREY, font: FONT }), run(`   ${fmtPct(g.pct)}`, { sz: 1300, b: true, color: TEAL, font: FONT })];
+    if (pg) head.push(run(`   (${versaoLabel(v.prev)}: ${fmtPct(pg.pct)}  ${deltaLabel(g.pct, pg.pct)})`, { sz: 1000, color: '6D6E71', font: FONT }));
+    textBox(s, { x: bx, y, w: bw, h: 300000, paras: [para(head)], name: 'Grupo ' + g.d.grupo, anchor: 'ctr' });
+    rectShape(s, { x: bx + 75600, y: y + 320000, w: bw - 150000, h: 190000, fill: 'E3E3E3', round: 50000, name: 'Trilho' });
+    const fw = Math.round((bw - 150000) * Math.max(0, Math.min(100, g.pct ?? 0)) / 100);
+    if (fw > 0) rectShape(s, { x: bx + 75600, y: y + 320000, w: Math.max(fw, 120000), h: 190000, fill: (g.pct ?? 0) >= 100 ? '2E9D52' : TEAL, round: 50000, name: 'Avanço' });
+    if (pg && pg.pct != null) rectShape(s, { x: bx + 75600 + Math.round((bw - 150000) * pg.pct / 100) - 9000, y: y + 290000, w: 18000, h: 250000, fill: 'F58220', name: 'Marcador anterior' });
+  });
+  if (v.prev) textBox(s, { x: bx, y: 1000000 + groups.length * step - 120000, w: bw, h: 220000, paras: [para([run(`▏laranja = avanço na ${versaoLabel(v.prev)}`, { sz: 800, color: 'F58220', font: FONT })], { algn: 'r' })], name: 'Legenda' });
+  obsBox(s, v.conclusao, { y: 3650000, h: 1800000, big: true });
+  return s;
+}
+
+function acompGroupSlide(v, def, inst) {
+  const s = new Slide(13);
+  const gc = groupCalc(v, def, inst);
+  const pg = v.prev?.groups?.[def.id];
+  titleShape(s, 'Acompanhamento - ' + instTitle(def, inst));
+  frameShapes(s);
+  const hs = [run('Avanço do grupo: ', { sz: 900, b: true, color: TEAL, font: FONT }), run(fmtPct(gc.pct), { sz: 900, b: true, color: GREY, font: FONT }),
+    run(`   (${gc.filled} de ${gc.total} itens preenchidos)`, { sz: 900, color: GREY, font: FONT })];
+  if (pg) hs.push(run(`    ${versaoLabel(v.prev)}: ${fmtPct(pg.pct)}  ${deltaLabel(gc.pct, pg.pct)}`, { sz: 900, b: true, color: GREY, font: FONT }));
+  textBox(s, { x: FRAME.x + 100000, y: FRAME.y + 40000, w: FRAME.w - 200000, h: 260000, paras: [para(hs)], name: 'Resumo', anchor: 'ctr' });
+
+  const prev = !!pg;
+  const rest = prev ? [700000, 1000000, 1000000, 1000000, 880000, 900000, 1350000] : [800000, 1100000, 1100000, 1100000, 980000, 1100000];
+  const total = FRAME.w - 200000;
+  const colW = [total - rest.reduce((a, b) => a + b, 0), ...rest];
+  const sz = 1200, rowH = 410000;
+  const H = (t, algn = 'ctr') => cell(t, { sz: 1100, fill: TEAL, color: 'FFFFFF', b: true, algn });
+  const rows = [{ h: 360000, cells: [H('Item', 'l'), H('Projeto'), H('Instalado'), H('Fusionado'), H('Conectado'), H('Pendente'), H('Avanço'), ...(prev ? [H(`vs ${versaoLabel(v.prev)}`)] : [])] }];
+  for (const { it, c } of gc.items) {
+    const cells = [cell(it.text, { sz, b: true }), cell(c.proj != null ? String(c.proj) : '—', { sz, algn: 'ctr', b: true })];
+    for (const e of ['inst', 'fus', 'conec']) {
+      if (!it.etapas.includes(e)) { cells.push(cell('—', { sz, algn: 'ctr', color: 'B5B5B5', fill: 'F7F7F7' })); continue; }
+      const val = c.vals[e];
+      if (val == null) { cells.push(cell('–', { sz, algn: 'ctr', color: '939598' })); continue; }
+      const l = c.pcts[e] != null ? lvl(c.pcts[e]) : {};
+      cells.push(cell(c.pcts[e] != null ? `${val} · ${c.pcts[e]}%` : String(val), { sz, algn: 'ctr', b: true, fill: l.fill, color: l.color || GREY }));
+    }
+    cells.push(cell(c.pend != null && c.filled ? String(c.pend) : '–', { sz, algn: 'ctr' }));
+    const al = c.pct != null ? lvl(c.pct) : {};
+    cells.push(cell(fmtPct(c.pct), { sz, algn: 'ctr', b: true, fill: al.fill, color: al.color || GREY }));
+    if (prev) {
+      const pi = pg.items?.[it.key]; const dl = c.pct != null && pi?.pct != null ? deltaLabel(c.pct, pi.pct) : '';
+      const d = c.pct != null && pi?.pct != null ? c.pct - pi.pct : 0;
+      cells.push(cell(pi ? `${fmtPct(pi.pct)}  ${dl}`.trim() : '—', { sz: 900, algn: 'ctr', color: d > 0 ? '1E6B34' : d < 0 ? 'B3261E' : GREY, b: !!dl }));
+    }
+    rows.push({ h: rowH, cells });
+  }
+  tableShape(s, { x: FRAME.x + 100000, y: 1130000, colW, rows });
+  const tableEnd = 1130000 + rows.reduce((a, r) => a + r.h, 0);
+  obsBox(s, inst.obs, { y: Math.max(tableEnd + 150000, 3600000), h: 5450000 - Math.max(tableEnd + 150000, 3600000), big: true });
+  return [s];
+}
+
 // ---------- montagem do pacote ----------
 export async function buildPptx({ JSZip, template, vistoria, checklist, photoBytes = new Map(), logos = {}, coverBytes = null }) {
   const zip = await JSZip.loadAsync(template);
-  const defs = new Map(checklist.grupos.map((g) => [g.id, expandGroup(checklist, g)]));
+  const ac = tipoOf(vistoria) === 'acomp';
+  const defs = ac ? new Map(expandAcomp(checklist).map((d) => [d.id, d])) : new Map(checklist.grupos.map((g) => [g.id, expandGroup(checklist, g)]));
   let mediaN = 0;
   const media = [];
   const ctx = {
@@ -336,13 +447,14 @@ export async function buildPptx({ JSZip, template, vistoria, checklist, photoByt
   };
 
   const slides = [coverSlide(vistoria, ctx)];
+  if (ac) slides.push(conclusionSlide(vistoria, defs));
   // ordem: a do checklist.json, instâncias na ordem de criação
   const order = checklist.grupos.map((g) => g.id);
   const insts = [...(vistoria.groups || [])].sort((a, b) => order.indexOf(a.groupId) - order.indexOf(b.groupId));
   for (const inst of insts) {
     const def = defs.get(inst.groupId);
     if (!def || !hasContent(def, inst)) continue;
-    slides.push(...checklistSlides(def, inst));
+    slides.push(...(ac ? acompGroupSlide(vistoria, def, inst) : checklistSlides(def, inst)));
     slides.push(...evidenceSlides(def, inst, ctx));
   }
 
@@ -371,7 +483,7 @@ export async function buildPptx({ JSZip, template, vistoria, checklist, photoByt
   const core = zip.file('docProps/core.xml');
   if (core) {
     let c = await core.async('string');
-    const title = `Vistoria – ${vistoria.header?.empreendimento || ''} ${vistoria.header?.siteId || ''}`.trim();
+    const title = `${ac ? 'Acompanhamento' : 'Vistoria'} – ${vistoria.header?.empreendimento || ''} ${vistoria.header?.siteId || ''}`.trim();
     if (/<dc:title>.*?<\/dc:title>|<dc:title\/>/s.test(c)) c = c.replace(/<dc:title>.*?<\/dc:title>|<dc:title\/>/s, `<dc:title>${esc(title)}</dc:title>`);
     zip.file('docProps/core.xml', c);
   }

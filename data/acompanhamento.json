@@ -1,0 +1,27 @@
+{
+  "meta": { "tipo": "acompanhamento", "nome": "Vistoria de Acompanhamento" },
+  "cabecalho_projeto": [
+    { "campo": "qtdSetores", "rotulo": "Qtd. de setores", "dica": "Considerar o total de setores 5G + 4G" },
+    { "campo": "qtdIdfs", "rotulo": "Qtd. de IDFs", "dica": "Considerar o total de IDFs 5G + 4G" },
+    { "campo": "qtdNanos", "rotulo": "Qtd. de Nanos", "dica": "Considerar o total de Nanos 5G + 4G" }
+  ],
+  "grupos": [
+    { "id": "hbts", "grupo": "HBTS", "itens": [
+      { "item": "Racks", "etapas": ["inst", "conec"] },
+      { "item": "SubRacks", "etapas": ["inst", "conec"] },
+      { "item": "Cards POI", "etapas": ["inst", "conec"] },
+      { "item": "DGO 96", "etapas": ["inst", "conec"] },
+      { "item": "AUs", "etapas": ["inst", "conec"] }
+    ] },
+    { "id": "idf", "grupo": "IDF", "itens": [
+      { "item": "IDFs", "etapas": ["inst"], "proj_de": "qtdIdfs" },
+      { "item": "EUs", "etapas": ["inst", "conec"] },
+      { "item": "DIO 12", "etapas": ["inst", "fus", "conec"] },
+      { "item": "FOs 48", "etapas": ["inst", "fus", "conec"] }
+    ] },
+    { "id": "nanos", "grupo": "Nanos (N3RU)", "itens": [
+      { "item": "Cabo híbrido (CTO-DGO)", "etapas": ["inst", "fus"], "proj_de": "qtdNanos", "dica": "Considerar a quantidade de Nanos" },
+      { "item": "Nanos", "etapas": ["inst", "conec"], "proj_de": "qtdNanos" }
+    ] }
+  ]
+}

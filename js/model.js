@@ -65,6 +65,7 @@ export function hasContent(def, inst) {
   if (inst.obs && inst.obs.trim()) return true;
   if ((inst.photos || []).length) return true;
   if (Object.keys(inst.answers || {}).length) return true;
+  if (Object.values(inst.qty || {}).some((q) => Object.values(q || {}).some((x) => String(x ?? '').trim() !== ''))) return true;
   return Object.values(inst.values || {}).some((v) => v && String(v.v ?? '').trim() !== '');
 }
 
@@ -105,4 +106,81 @@ export function baseName(v) {
   const clean = (x) => String(x || '').replace(/[\\/:*?"<>|#%~]+/g, ' ').replace(/\s+/g, ' ').trim();
   const parts = [clean(v.header?.siteId), clean(v.header?.empreendimento)].filter(Boolean);
   return (parts.join(' - ') || 'Vistoria').slice(0, 90).trim();
+}
+
+// ---------- tipos de vistoria ----------
+export const TIPOS = {
+  prehof: { nome: 'Pré-HOF', arquivo: 'data/checklist.json' },
+  acomp: { nome: 'Acompanhamento', arquivo: 'data/acompanhamento.json' },
+};
+export const tipoOf = (v) => (v?.tipo === 'acomp' ? 'acomp' : 'prehof');
+export const versaoLabel = (v) => `v${v.versao || 1}.0`;
+/** Rótulo do tipo para nomes de arquivo/pasta: "" (Pré-HOF) ou "Acompanhamento v2.0". */
+export function typeTag(v) { return tipoOf(v) === 'acomp' ? `Acompanhamento ${versaoLabel(v)}` : ''; }
+
+// ---------- acompanhamento (instalado x projetado) ----------
+export const ETAPAS = { inst: 'Instalado', fus: 'Fusionado', conec: 'Conectado' };
+export const ETAPA_ORDER = ['inst', 'fus', 'conec'];
+
+export function expandAcomp(cfg) {
+  return cfg.grupos.map((g) => ({
+    id: g.id, grupo: g.grupo, instancias: 'única', tipo: 'acomp', campos: [],
+    items: g.itens.map((it) => ({ key: slug(it.item), text: it.item, etapas: it.etapas, projDe: it.proj_de || null, dica: it.dica || null })),
+  }));
+}
+
+export function num(x) {
+  if (x === undefined || x === null || String(x).trim() === '') return null;
+  const n = Number(String(x).replace(',', '.'));
+  return Number.isFinite(n) ? n : null;
+}
+
+/** Cálculo de um item: % de cada etapa (valor/projeto), % do item (média das etapas) e pendente. */
+export function itemCalc(v, it, q = {}) {
+  const proj = num(q.proj) ?? num(it.projDe ? v.header?.[it.projDe] : null);
+  const vals = {}, pcts = {};
+  let any = false;
+  for (const e of it.etapas) { vals[e] = num(q[e]); if (vals[e] !== null) any = true; }
+  const last = it.etapas[it.etapas.length - 1];
+  let pct = null;
+  if (proj && proj > 0 && any) {
+    let sum = 0;
+    for (const e of it.etapas) { const r = Math.min(1, (vals[e] ?? 0) / proj); pcts[e] = Math.round(r * 100); sum += r; }
+    pct = Math.round((sum / it.etapas.length) * 100);
+  }
+  const pend = proj != null ? Math.max(0, proj - (vals[last] ?? 0)) : null;
+  return { proj, vals, pcts, pct, pend, filled: any, semProjeto: any && !(proj > 0) };
+}
+export function groupCalc(v, def, inst) {
+  const items = def.items.map((it) => ({ it, c: itemCalc(v, it, inst.qty?.[it.key]) }));
+  const ps = items.filter((x) => x.c.pct !== null).map((x) => x.c.pct);
+  return { items, pct: ps.length ? Math.round(ps.reduce((a, b) => a + b, 0) / ps.length) : null, filled: items.filter((x) => x.c.filled).length, total: items.length };
+}
+/** Avanço geral = média do avanço dos grupos (como na planilha antiga). */
+export function overallCalc(v, defMap) {
+  const groups = [];
+  for (const g of v.groups || []) {
+    if (g.na) continue;
+    const d = defMap.get(g.groupId); if (!d) continue;
+    groups.push({ g, d, ...groupCalc(v, d, g) });
+  }
+  const ps = groups.filter((x) => x.pct !== null).map((x) => x.pct);
+  return { groups, pct: ps.length ? Math.round(ps.reduce((a, b) => a + b, 0) / ps.length) : null };
+}
+/** Resumo guardado na próxima versão, para comparar a evolução. */
+export function snapshotOf(v, defMap) {
+  const o = overallCalc(v, defMap);
+  const groups = {};
+  for (const x of o.groups) {
+    const items = {};
+    for (const { it, c } of x.items) items[it.key] = { proj: c.proj, vals: c.vals, pct: c.pct };
+    groups[x.g.groupId] = { pct: x.pct, items };
+  }
+  return { id: v.id, versao: v.versao || 1, data: v.endAt || v.startAt, pct: o.pct, groups };
+}
+export const fmtPct = (p) => (p == null ? '—' : p + '%');
+export function deltaLabel(cur, prev) {
+  if (cur == null || prev == null) return '';
+  const d = cur - prev;
+  return d === 0 ? '= 0 p.p.' : `${d > 0 ? '▲ +' : '▼ '}${d} p.p.`;
 }

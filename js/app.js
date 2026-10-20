@@ -1,4 +1,5 @@
-import { STATUS, STATUS_ORDER, YN, expandAll, scoreGroup, hasContent, needsPhoto, normAnswer, instTitle, baseName, OPERADORAS, uid, fmtDate, fmtTime, pad } from './model.js';
+import { STATUS, STATUS_ORDER, YN, expandAll, scoreGroup, hasContent, needsPhoto, normAnswer, instTitle, baseName, OPERADORAS, uid, fmtDate, fmtTime, pad,
+  TIPOS, tipoOf, versaoLabel, typeTag, ETAPAS, expandAcomp, itemCalc, groupCalc, overallCalc, snapshotOf, fmtPct, deltaLabel } from './model.js';
 import * as db from './db.js';
 import * as cloud from './cloud.js';
 import { buildPptx } from './pptx-builder.js';
@@ -8,6 +9,10 @@ const view = $('#view');
 const E = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
 let checklist, defs, defMap;
+let acompCfg, acompDefs, acompMap;
+const isAcomp = (v = V) => tipoOf(v) === 'acomp';
+const dmOf = (v = V) => (isAcomp(v) ? acompMap : defMap);
+const defsOf = (v = V) => (isAcomp(v) ? acompDefs : defs);
 let V = null; // vistoria aberta
 let deferredInstall = null;
 const urls = new Map();
@@ -98,21 +103,22 @@ function getGPS() {
 }
 
 // ---------- modelo ----------
-const newInst = (d, label = '') => ({ gid: uid(), groupId: d.id, label, na: false, answers: {}, values: {}, obs: '', photos: [] });
+const newInst = (d, label = '') => ({ gid: uid(), groupId: d.id, label, na: false, answers: {}, values: {}, qty: {}, obs: '', photos: [] });
 const instsOf = (d) => V.groups.filter((g) => g.groupId === d.id);
 const isUnique = (d) => d.instancias === 'única';
 const DEFAULT_LABEL = { idf: 'IDF', miniqdca: 'IDF', n3ru: 'Unidade', gab_poi: 'Gab.', gab_ftta: 'Gab.', gab_5g: 'Gab.', hbts_op: 'Operadora', qdca_op: 'Operadora' };
 
-function newVistoria() {
+function newVistoria(tipo = 'prehof') {
   const now = new Date().toISOString();
-  const v = { id: uid(), createdAt: now, updatedAt: now, dirty: true, startAt: now, endAt: null, gps: null, cover: null, removedPhotos: [],
-    header: { siteId: '', empreendimento: '', projeto: '', implantadora: '', operadoras: [], outraOperadora: '' }, groups: [] };
-  for (const d of defs) if (isUnique(d)) v.groups.push(newInst(d));
+  const v = { id: uid(), tipo, versao: tipo === 'acomp' ? 1 : undefined, prev: null, conclusao: '', createdAt: now, updatedAt: now, dirty: true, startAt: now, endAt: null, gps: null, cover: null, removedPhotos: [],
+    header: { siteId: '', empreendimento: '', projeto: '', implantadora: '', operadoras: [], outraOperadora: '', qtdSetores: '', qtdIdfs: '', qtdNanos: '' }, groups: [] };
+  for (const d of defsOf(v)) if (isUnique(d)) v.groups.push(newInst(d));
   return v;
 }
 
 function opLabel(key) { return OPERADORAS[key]?.nome || key; }
 function syncOperatorGroups() {
+  if (isAcomp()) return;
   const keys = V.header.operadoras.map(opLabel);
   for (const id of ['hbts_op', 'qdca_op']) {
     const d = defMap.get(id);
@@ -121,7 +127,8 @@ function syncOperatorGroups() {
   }
 }
 
-function progressOf(d, inst) {
+function progressOf(d, inst, v = V) {
+  if (d.tipo === 'acomp') { const c = groupCalc(v, d, inst); return { done: c.filled, total: c.total, pct: c.pct ?? 0, avanco: c.pct }; }
   const st = d.items.filter((i) => i.tipo === 'status' || i.tipo === 'yn');
   const done = st.filter((i) => inst.answers[i.key]).length;
   let total = st.length;
@@ -131,14 +138,15 @@ function progressOf(d, inst) {
   }
   return { done, total, pct: Math.round((done / total) * 100) };
 }
-function overall() {
+function overall(v = V) {
+  if (isAcomp(v)) { const o = overallCalc(v, acompMap); return { done: 0, total: 0, pct: o.pct ?? 0 }; }
   let done = 0, total = 0;
-  for (const g of V.groups) { if (g.na) continue; const p = progressOf(defMap.get(g.groupId), g); done += p.done; total += p.total; }
+  for (const g of v.groups) { if (g.na) continue; const p = progressOf(defMap.get(g.groupId), g, v); done += p.done; total += p.total; }
   return { done, total, pct: total ? Math.round((done / total) * 100) : 0 };
 }
 
 // ---------- layout (barra superior) ----------
-const APP_VERSION = '1.0.6'; // manter igual ao VERSION de sw.js
+const APP_VERSION = '1.1.0'; // manter igual ao VERSION de sw.js
 function setTop({ back, title, right = '' }) {
   $('#top').innerHTML = (back ? `<a class="icon-btn" href="${back}" aria-label="Voltar" style="text-decoration:none;display:grid;place-items:center">←</a>` : `<img src="assets/qmc-logo.png" alt="QMC">`) + `<h1>${E(title)}</h1><span class="ver">v${APP_VERSION}</span>${right}`;
 }
@@ -161,27 +169,30 @@ async function viewHome() {
   view.innerHTML = `
     ${note}
     <div class="row" style="margin-bottom:14px">
-      <button class="btn primary grow" data-act="new">＋ Nova vistoria</button>
+      <button class="btn primary grow" data-act="new" data-tipo="prehof">＋ Pré-HOF</button>
+      <button class="btn primary grow" data-act="new" data-tipo="acomp">＋ Acompanhamento</button>
       ${deferredInstall ? `<button class="btn ghost" data-act="install">Instalar app</button>` : ''}
     </div>
-    ${list.length ? `<div class="card vlist">${list.map(vItem).join('')}</div>` : `<div class="empty">Nenhuma vistoria ainda.<br>Toque em “Nova vistoria” para começar.</div>`}`;
+    ${list.length ? `<div class="card vlist">${list.map(vItem).join('')}</div>` : `<div class="empty">Nenhuma vistoria ainda.<br>Toque em “Pré-HOF” ou “Acompanhamento” para começar.</div>`}`;
 }
 function vItem(v) {
   const h = v.header || {};
   const done = !!v.endAt;
-  let pct = 0, total = 0, d0 = 0;
-  for (const g of v.groups || []) { if (g.na) continue; const p = progressOf(defMap.get(g.groupId), g); d0 += p.done; total += p.total; }
-  pct = total ? Math.round((d0 / total) * 100) : 0;
+  const pct = isAcomp(v) ? overall(v).pct : (() => { let t = 0, d0 = 0; for (const g of v.groups || []) { if (g.na) continue; const p = progressOf(defMap.get(g.groupId), g, v); d0 += p.done; t += p.total; } return t ? Math.round((d0 / t) * 100) : 0; })();
+  const tipoBadge = `<span class="badge tipo">${isAcomp(v) ? 'Acomp. ' + versaoLabel(v) : 'Pré-HOF'}</span>`;
   const sync = !cloud.user() ? '' : (v.dirty ? '<span class="badge warn">não enviada</span>' : '<span class="badge sync">☁ ok</span>');
-  return `<a class="item" href="#/v/${v.id}"><div class="grow"><div class="t">${E(h.empreendimento || 'Sem nome')}</div><div class="s">${E(h.siteId || 'sem ID')} · ${fmtDate(v.startAt)} ${fmtTime(v.startAt)} · ${pct}%</div></div>${sync}<span class="badge ${done ? 'done' : 'go'}">${done ? 'Finalizada' : 'Em andamento'}</span></a>`;
+  return `<a class="item" href="#/v/${v.id}"><div class="grow"><div class="t">${E(h.empreendimento || 'Sem nome')}</div><div class="s">${E(h.siteId || 'sem ID')} · ${fmtDate(v.startAt)} ${fmtTime(v.startAt)} · ${isAcomp(v) ? 'avanço ' : ''}${pct}%</div></div>${tipoBadge}${sync}<span class="badge ${done ? 'done' : 'go'}">${done ? 'Finalizada' : 'Em andamento'}</span></a>`;
 }
 
 // ---------- VISTORIA (visão geral) ----------
 async function viewVistoria() {
-  setTop({ back: '#/', title: V.header.empreendimento || 'Nova vistoria', right: `<span class="pill" id="ovPct">${overall().pct}%</span>` });
+  setTop({ back: '#/', title: V.header.empreendimento || (isAcomp() ? 'Novo acompanhamento' : 'Nova vistoria'), right: `<span class="pill" id="ovPct">${overall().pct}%</span>` });
   const h = V.header;
   const coverUrl = V.cover ? await photoURL(V.cover.id) : '';
+  const ac = isAcomp();
+  const prevInfo = ac && V.prev ? `<div class="okbox" style="background:var(--teal-bg);color:var(--teal)">Comparando com a vistoria <b>${versaoLabel(V.prev)}</b> (${fmtDate(V.prev.data)}) — avanço geral anterior: <b>${fmtPct(V.prev.pct)}</b>.</div>` : '';
   view.innerHTML = `
+  ${ac ? `<div class="card" style="display:flex;gap:10px;align-items:center"><div class="grow"><b>Vistoria de Acompanhamento ${versaoLabel(V)}</b><div class="muted">Instalado × projetado por item</div></div><span class="badge tipo">${versaoLabel(V)}</span></div>${prevInfo}` : ''}
   <div class="card"><h2>Dados da vistoria</h2>
     <div class="grid">
       <div><label class="f">ID do Site</label><input type="text" data-h="siteId" value="${E(h.siteId)}" placeholder="ex.: BR-SP-ACD-03170-QMC" autocapitalize="characters"></div>
@@ -192,6 +203,8 @@ async function viewVistoria() {
     <label class="f" style="margin-top:14px">Operadora(s)</label>
     <div class="chips">${Object.entries(OPERADORAS).map(([k, o]) => `<button class="chip ${h.operadoras.includes(k) ? 'on' : ''}" data-op="${k}">${E(o.nome)}</button>`).join('')}</div>
     <div style="margin-top:10px"><input type="text" data-h="outraOperadora" value="${E(h.outraOperadora)}" placeholder="Outra operadora (opcional)"></div>
+    ${ac ? `<label class="f" style="margin-top:14px">Quantidades de projeto</label>
+    <div class="grid">${acompCfg.cabecalho_projeto.map((c) => `<div><label class="f">${E(c.rotulo)}</label><input type="number" inputmode="numeric" min="0" step="1" data-h="${c.campo}" value="${E(h[c.campo] ?? '')}"><div class="muted" style="font-size:12.5px;margin-top:3px">💡 ${E(c.dica)}</div></div>`).join('')}</div>` : ''}
   </div>
 
   <div class="card"><h2>Foto do empreendimento</h2>
@@ -206,6 +219,12 @@ async function viewVistoria() {
 
   <div id="groups">${groupsHTML()}</div>
 
+  ${ac ? `<div class="card"><h2>Conclusão</h2>
+    <div class="row" style="margin-bottom:10px"><div style="font-size:34px;font-weight:800;color:var(--teal)" id="conclPct">${fmtPct(overall().pct)}</div><div class="muted">avanço geral<br>${V.prev ? `${versaoLabel(V.prev)}: ${fmtPct(V.prev.pct)} ${deltaLabel(overall().pct, V.prev.pct)}` : 'média do avanço dos grupos'}</div></div>
+    <textarea data-concl placeholder="Observação da conclusão (vai no slide logo após a capa)">${E(V.conclusao || '')}</textarea>
+    <div class="row" style="margin-top:12px"><button class="btn teal small" data-act="nextver">＋ Criar próxima vistoria (v${(V.versao || 1) + 1}.0)</button></div>
+    <p class="muted" style="margin:8px 0 0">A próxima versão já vem com os dados do cabeçalho e usa esta vistoria como comparação.</p>
+  </div>` : ''}
   <div class="card"><button class="btn danger small" data-act="delv">Excluir esta vistoria</button></div>
   <div class="sticky"><a class="btn primary" style="text-decoration:none;text-align:center;display:block;padding-top:14px" href="#/v/${V.id}/fim">Revisar e gerar relatório →</a></div>`;
 }
@@ -217,7 +236,7 @@ function autoHTML() {
 }
 function groupsHTML() {
   let out = '';
-  for (const d of defs) {
+  for (const d of defsOf()) {
     const ins = instsOf(d);
     if (isUnique(d)) { if (ins[0]) out += `<div class="gh" style="display:none"></div>` + grpRow(d, ins[0]); continue; }
     out += `<div class="gh"><h3>${E(d.grupo)}</h3><button class="btn ghost small" data-add="${d.id}">＋ Adicionar</button></div>`;
@@ -228,14 +247,17 @@ function groupsHTML() {
 function grpRow(d, inst) {
   const p = progressOf(d, inst);
   const ph = inst.photos.length;
+  const prevG = V.prev?.groups?.[d.id];
+  const info = d.tipo === 'acomp' ? `avanço ${fmtPct(p.avanco)}${prevG ? ` (ant. ${fmtPct(prevG.pct)})` : ''} · ${p.done}/${p.total} itens` : `${p.done}/${p.total}`;
   return `<a class="grp ${inst.na ? 'na' : ''}" href="#/v/${V.id}/g/${inst.gid}"><div class="grow"><div class="t">${E(instTitle(d, inst))}</div>
-    <div class="s">${inst.na ? 'Não se aplica' : `${p.done}/${p.total} · ${ph} foto${ph === 1 ? '' : 's'}`}${needsPhoto(d, inst) ? ' · <b style="color:var(--nok)">foto obrigatória</b>' : ''}</div>
+    <div class="s">${inst.na ? 'Não se aplica' : `${info} · ${ph} foto${ph === 1 ? '' : 's'}`}${needsPhoto(d, inst) ? ' · <b style="color:var(--nok)">foto obrigatória</b>' : ''}</div>
     ${inst.na ? '' : `<div class="bar ${p.pct === 100 ? 'full' : ''}"><i style="width:${p.pct}%"></i></div>`}</div><span class="chev">›</span></a>`;
 }
 function refreshOverviewBits() {
   const g = $('#groups'); if (g) g.innerHTML = groupsHTML();
   const a = $('#auto'); if (a) a.innerHTML = autoHTML();
   const p = $('#ovPct'); if (p) p.textContent = overall().pct + '%';
+  const cp = $('#conclPct'); if (cp) cp.textContent = fmtPct(overall().pct);
 }
 
 // ---------- GRUPO ----------
@@ -269,9 +291,10 @@ let curInst = null, curDef = null;
 async function viewGroup(gid) {
   const inst = V.groups.find((g) => g.gid === gid);
   if (!inst) { location.hash = `#/v/${V.id}`; return; }
-  const d = defMap.get(inst.groupId);
+  const d = dmOf().get(inst.groupId);
   curInst = inst; curDef = d;
   setTop({ back: `#/v/${V.id}`, title: instTitle(d, inst) });
+  if (d.tipo === 'acomp') return viewGroupAcomp(inst, d);
   const hasSt = d.items.length > 0;
   view.innerHTML = `
   <div class="card" style="display:flex;align-items:center;gap:12px">
@@ -297,7 +320,67 @@ async function viewGroup(gid) {
   updateGroupProgress();
   renderPhotos();
 }
+// ---- grupo de acompanhamento (instalado x projetado) ----
+const qField = (key, f, label, val, ph = '') => `<label class="qf"><span>${label}</span><input type="number" inputmode="numeric" min="0" step="1" data-q="${E(key)}|${f}" value="${E(val ?? '')}" placeholder="${E(ph)}"></label>`;
+function prevLine(it) {
+  const pi = V.prev?.groups?.[curDef.id]?.items?.[it.key];
+  if (!pi) return '';
+  const parts = [`proj ${pi.proj ?? '—'}`, ...it.etapas.map((e) => `${ETAPAS[e].toLowerCase()} ${pi.vals?.[e] ?? '—'}`)];
+  return `<div class="prev">Anterior (${versaoLabel(V.prev)}): ${parts.join(' · ')}${pi.pct != null ? ` — ${pi.pct}%` : ''}</div>`;
+}
+function qSubHTML(it, c) {
+  if (!c.filled) return '<span class="muted">Preencha as quantidades.</span>';
+  if (c.semProjeto) return '<span style="color:var(--nok);font-weight:600">Informe a quantidade de projeto.</span>';
+  const parts = it.etapas.map((e) => `${ETAPAS[e]} <b>${c.pcts[e] ?? 0}%</b>`);
+  return `${parts.join(' · ')}${c.pend ? ` · faltam <b>${c.pend}</b>` : ' · <b style="color:var(--ok)">concluído</b>'}`;
+}
+function qItemHTML(it, inst) {
+  const q = inst.qty?.[it.key] || {};
+  const c = itemCalc(V, it, q);
+  const defProj = it.projDe ? V.header[it.projDe] : '';
+  return `<div class="qi" data-qi="${E(it.key)}"><div class="qh"><b>${E(it.text)}</b><span class="badge ${c.pct === 100 ? 'done' : 'go'}" data-qpct>${fmtPct(c.pct)}</span></div>
+    ${it.dica ? `<div class="hint">💡 ${E(it.dica)}</div>` : ''}
+    <div class="qgrid">${qField(it.key, 'proj', 'Projeto', q.proj, defProj !== '' && defProj != null ? String(defProj) : '')}${it.etapas.map((e) => qField(it.key, e, ETAPAS[e], q[e])).join('')}</div>
+    <div class="qs" data-qsub>${qSubHTML(it, c)}</div>${prevLine(it)}</div>`;
+}
+function refreshQItem(key) {
+  const it = curDef.items.find((i) => i.key === key); const box = $(`[data-qi="${CSS.escape(key)}"]`);
+  if (!it || !box) return;
+  const c = itemCalc(V, it, curInst.qty?.[key]);
+  const b = box.querySelector('[data-qpct]'); b.textContent = fmtPct(c.pct); b.className = 'badge ' + (c.pct === 100 ? 'done' : 'go');
+  box.querySelector('[data-qsub]').innerHTML = qSubHTML(it, c);
+}
+function updateAcompGroup() {
+  const el = $('#gprog'); if (!el) return;
+  const c = groupCalc(V, curDef, curInst); const pg = V.prev?.groups?.[curDef.id];
+  el.textContent = `Avanço do grupo: ${fmtPct(c.pct)} · ${c.filled} de ${c.total} itens preenchidos${pg ? ` · ${versaoLabel(V.prev)}: ${fmtPct(pg.pct)} ${deltaLabel(c.pct, pg.pct)}` : ''}`;
+  const bar = $('#gbar'); bar.className = 'bar ' + (c.pct === 100 ? 'full' : ''); bar.firstElementChild.style.width = (c.pct ?? 0) + '%';
+}
+function viewGroupAcomp(inst, d) {
+  view.innerHTML = `
+  <div class="card" style="display:flex;align-items:center;gap:12px">
+    <div class="grow"><b id="gprog"></b><div class="bar" id="gbar"><i></i></div></div>
+    <label class="row" style="gap:8px;font-size:14px"><input type="checkbox" id="naChk" ${inst.na ? 'checked' : ''} style="width:20px;height:20px"> Não se aplica</label>
+  </div>
+  <div id="body" ${inst.na ? 'hidden' : ''}>
+    <div class="card"><h2>Quantidades</h2>
+      <p class="muted" style="margin-top:-4px">Informe o <b>projeto</b> e quanto já foi <b>instalado / fusionado / conectado</b>. O avanço é calculado automaticamente.</p>
+      <div id="items">${d.items.map((it) => qItemHTML(it, inst)).join('')}</div></div>
+    <div class="card"><h2>Observação do grupo</h2><textarea data-obs placeholder="Observações gerais deste grupo (vai no slide da tabela)">${E(inst.obs)}</textarea></div>
+    <div class="card"><h2>Fotos <span class="muted" style="text-transform:none;letter-spacing:0">(2 por slide)</span></h2>
+      <div class="row" style="margin-bottom:12px">
+        <label class="btn primary small" style="cursor:pointer">📷 Tirar foto<input type="file" accept="image/*" capture="environment" id="camIn" hidden></label>
+        <label class="btn teal small" style="cursor:pointer">🖼 Galeria<input type="file" accept="image/*" multiple id="galIn" hidden></label>
+      </div>
+      <div class="photos" id="photos"></div>
+    </div>
+  </div>
+  <div class="sticky"><a class="btn teal" style="text-decoration:none;text-align:center;display:block;padding-top:14px" href="#/v/${V.id}">Concluir grupo ✓</a></div>`;
+  updateAcompGroup();
+  renderPhotos();
+}
 function updateGroupProgress() {
+  if (curDef?.tipo === 'acomp') return updateAcompGroup();
   const p = progressOf(curDef, curInst);
   const el = $('#gprog'); if (!el) return;
   const sc = scoreGroup(curDef, curInst);
@@ -343,9 +426,16 @@ async function removePhoto(id) {
 function collectWarnings() {
   const w = [], block = [];
   let pend = 0;
+  if (isAcomp()) {
+    for (const x of overallCalc(V, acompMap).groups) {
+      if (!hasContent(x.d, x.g)) continue;
+      for (const { it, c } of x.items) if (c.semProjeto) w.push(`${x.d.grupo} – ${it.text}: informe a quantidade de projeto (o item não entra no cálculo)`);
+    }
+    return { w, block, pend };
+  }
   for (const g of V.groups) {
     if (g.na) continue;
-    const d = defMap.get(g.groupId); const sc = scoreGroup(d, g);
+    const d = dmOf().get(g.groupId); const sc = scoreGroup(d, g);
     if (hasContent(d, g) || sc.pend < sc.total) {
       pend += sc.pend;
       if (needsPhoto(d, g)) block.push(`${instTitle(d, g)}: ${sc.nok} item(ns) "Não conf." — adicione ao menos 1 foto de evidência`);
@@ -357,8 +447,9 @@ function collectWarnings() {
 }
 async function viewFinish() {
   setTop({ back: `#/v/${V.id}`, title: 'Relatório' });
+  if (isAcomp()) return viewFinishAcomp();
   const rows = [], vazios = [];
-  for (const d of defs) for (const g of instsOf(d)) {
+  for (const d of defsOf()) for (const g of instsOf(d)) {
     if (g.na) continue;
     const sc = scoreGroup(d, g);
     if (!hasContent(d, g)) { vazios.push(instTitle(d, g)); continue; }
@@ -386,6 +477,50 @@ async function viewFinish() {
     <p class="muted" id="genMsg"></p></div>`;
 }
 
+async function viewFinishAcomp() {
+  const o = overallCalc(V, acompMap);
+  const rows = [], vazios = [];
+  for (const x of o.groups) {
+    if (!hasContent(x.d, x.g)) { vazios.push(x.d.grupo); continue; }
+    const pg = V.prev?.groups?.[x.d.id];
+    rows.push(`<tr><td>${E(x.d.grupo)}</td><td class="c"><b>${fmtPct(x.pct)}</b></td>${V.prev ? `<td class="c">${fmtPct(pg?.pct)}</td><td class="c">${E(deltaLabel(x.pct, pg?.pct))}</td>` : ''}<td class="c">${x.filled}/${x.total}</td><td class="c">${x.g.photos.length}</td></tr>`);
+  }
+  const { w } = collectWarnings();
+  const canShare = !!(navigator.canShare && navigator.share);
+  view.innerHTML = `
+  ${w.length ? `<div class="warnbox"><b>Atenção:</b><ul style="margin:6px 0 0 18px;padding:0">${w.map((x) => `<li>${E(x)}</li>`).join('')}</ul></div>` : `<div class="okbox">Nenhuma pendência crítica encontrada.</div>`}
+  <div class="card"><h2>Avanço geral</h2>
+    <div class="row" style="margin-bottom:8px"><div style="font-size:38px;font-weight:800;color:var(--teal)">${fmtPct(o.pct)}</div><div class="muted">${V.prev ? `${versaoLabel(V.prev)}: ${fmtPct(V.prev.pct)} ${E(deltaLabel(o.pct, V.prev.pct))}` : 'média do avanço dos grupos'}</div></div>
+    <div style="overflow:auto"><table class="sum"><thead><tr><th>Grupo</th><th class="c">Avanço</th>${V.prev ? `<th class="c">${versaoLabel(V.prev)}</th><th class="c">Evolução</th>` : ''}<th class="c">Itens</th><th class="c">Fotos</th></tr></thead><tbody>${rows.join('') || `<tr><td colspan="${V.prev ? 6 : 4}" class="muted">Nenhum grupo preenchido ainda.</td></tr>`}</tbody></table></div>
+    ${vazios.length ? `<p class="muted"><b>Fora do relatório</b> (sem dados): ${E(vazios.join(' · '))}</p>` : ''}
+  </div>
+  <div class="card"><h2>Horário</h2><div class="auto">${autoHTML()}</div></div>
+  <div class="card"><div class="row">
+    <button class="btn primary grow" data-act="gen">${V.endAt ? 'Gerar PPTX novamente' : 'Finalizar vistoria e gerar PPTX'}</button>
+    ${V.endAt ? '<button class="btn ghost" data-act="reopen">Reabrir</button>' : ''}</div>
+    <div class="row" style="margin-top:10px">
+      ${canShare ? '<button class="btn ghost small" data-act="share" id="shareBtn" disabled>Compartilhar</button>' : ''}
+      ${cloud.user() ? '<button class="btn ghost small" data-act="onedrive" id="odBtn" disabled>Salvar no OneDrive</button>' : ''}
+    </div>
+    <p class="muted" id="genMsg"></p></div>`;
+}
+
+async function nextVersion() {
+  if (!confirm(`Criar a próxima vistoria de acompanhamento (v${(V.versao || 1) + 1}.0)? Ela começa com os dados do cabeçalho e compara com esta.`)) return;
+  await flush();
+  const n = newVistoria('acomp');
+  n.versao = (V.versao || 1) + 1;
+  n.prev = snapshotOf(V, acompMap);
+  n.header = { ...V.header, operadoras: [...(V.header.operadoras || [])] };
+  if (V.gps) n.gps = { ...V.gps };
+  if (V.cover) {
+    const rec = await db.getPhoto(V.cover.id);
+    if (rec?.blob) { const id = uid(); await db.putPhoto({ id, vid: n.id, blob: rec.blob, w: V.cover.w, h: V.cover.h, synced: false }); n.cover = { id, w: V.cover.w, h: V.cover.h }; }
+  }
+  await db.putVistoria(n); V = n; location.hash = `#/v/${n.id}`;
+  toast(`Vistoria ${versaoLabel(n)} criada`);
+}
+
 let lastPptx = null;
 async function generate() {
   const btn = $('[data-act=gen]'); const msg = $('#genMsg');
@@ -408,8 +543,8 @@ async function generate() {
     }
     let coverBytes = null;
     if (V.cover) { const rec = await db.getPhoto(V.cover.id); if (rec?.blob) coverBytes = new Uint8Array(await rec.blob.arrayBuffer()); }
-    const bytes = await buildPptx({ JSZip: window.JSZip, template: tpl, vistoria: V, checklist, photoBytes, logos, coverBytes });
-    const name = `${baseName(V)} - Vistoria ${V.startAt.slice(0, 10).replace(/-/g, '')}.pptx`;
+    const bytes = await buildPptx({ JSZip: window.JSZip, template: tpl, vistoria: V, checklist: isAcomp() ? acompCfg : checklist, photoBytes, logos, coverBytes });
+    const name = `${baseName(V)} - ${typeTag(V) || 'Vistoria'} ${V.startAt.slice(0, 10).replace(/-/g, '')}.pptx`;
     const blob = new Blob([bytes], { type: 'application/vnd.openxmlformats-officedocument.presentationml.presentation' });
     lastPptx = { blob, bytes, name };
     const a = document.createElement('a'); a.href = URL.createObjectURL(blob); a.download = name; document.body.appendChild(a); a.click();
@@ -465,10 +600,11 @@ async function onClick(e) {
   if (!act) return;
   switch (act) {
     case 'new': {
-      V = newVistoria(); await db.putVistoria(V); location.hash = `#/v/${V.id}`;
+      V = newVistoria(e.target.closest('[data-act]').dataset.tipo === 'acomp' ? 'acomp' : 'prehof'); await db.putVistoria(V); location.hash = `#/v/${V.id}`;
       getGPS().then((g) => { if (g && V) { V.gps = g; touch(); refreshOverviewBits(); } else if (!g) toast('Localização não disponível — permita o acesso ao GPS'); });
       break;
     }
+    case 'nextver': nextVersion(); break;
     case 'install': deferredInstall?.prompt(); deferredInstall = null; route(); break;
     case 'login': toast('Abrindo login da Microsoft…', 4000); cloud.signIn().catch((e) => toast('Erro no login: ' + (e.errorCode ? e.errorCode + ' – ' : '') + (e.message || e), 12000)); break;
     case 'logout': if (confirm('Sair da conta Microsoft? As vistorias continuam no aparelho.')) cloud.signOut(); break;
@@ -502,6 +638,12 @@ view.addEventListener('input', (e) => {
   if (t.dataset.h) { V.header[t.dataset.h] = t.value; if (t.dataset.h === 'empreendimento') $('#top h1').textContent = t.value || 'Nova vistoria'; touch(); }
   else if (t.dataset.obs !== undefined) { curInst.obs = t.value; touch(); }
   else if (t.dataset.po) { const p = curInst.photos.find((x) => x.id === t.dataset.po); if (p) { p.obs = t.value; touch(); } }
+  else if (t.dataset.concl !== undefined) { V.conclusao = t.value; touch(); }
+  else if (t.dataset.q) {
+    const [k, f] = t.dataset.q.split('|'); const q = (curInst.qty ||= {}); const o = (q[k] ||= {});
+    if (t.value === '') delete o[f]; else o[f] = t.value;
+    touch(); refreshQItem(k); updateAcompGroup();
+  }
   else if (t.dataset.nv) { const v = (curInst.values[t.dataset.nv] ||= {}); v.v = t.value; touch(); updateGroupProgress(); }
 });
 view.addEventListener('change', async (e) => {
@@ -549,6 +691,8 @@ window.addEventListener('online', () => doSync(false));
   try {
     checklist = await (await fetch('data/checklist.json')).json();
     defs = expandAll(checklist); defMap = new Map(defs.map((d) => [d.id, d]));
+    acompCfg = await (await fetch(TIPOS.acomp.arquivo)).json();
+    acompDefs = expandAcomp(acompCfg); acompMap = new Map(acompDefs.map((d) => [d.id, d]));
     if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch((e) => console.warn('SW', e));
     try { await cloud.initAuth(); } catch (e) { toast('Erro no login Microsoft: ' + (e.message || e), 6000); }
     await route();

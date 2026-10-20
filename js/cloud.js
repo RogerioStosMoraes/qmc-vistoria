@@ -1,6 +1,6 @@
 // Login Microsoft (MSAL) + sincronização com o OneDrive do próprio usuário (Microsoft Graph)
 import { CONFIG } from '../config.js';
-import { baseName } from './model.js';
+import { baseName, typeTag } from './model.js';
 import * as db from './db.js';
 
 let pca = null;
@@ -100,8 +100,9 @@ async function putFile(parts, body, contentType) {
 export function remoteFolderOf(v) {
   const d = new Date(v.createdAt);
   const ymd = `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, '0')}${String(d.getDate()).padStart(2, '0')}`;
-  if (!v.remote) v.remote = `${baseName(v)} - ${ymd} - ${v.id.slice(0, 6)}`;
-  v.remoteDesired = `${baseName(v)} - ${ymd} - ${v.id.slice(0, 6)}`;
+  const want = [baseName(v), typeTag(v), ymd, v.id.slice(0, 6)].filter(Boolean).join(' - ');
+  if (!v.remote) v.remote = want;
+  v.remoteDesired = want;
   return v.remote;
 }
 
