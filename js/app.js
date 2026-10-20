@@ -1,4 +1,4 @@
-import { STATUS, STATUS_ORDER, YN, expandAll, scoreGroup, hasContent, needsPhoto, normAnswer, instTitle, baseName, OPERADORAS, uid, fmtDate, fmtTime, pad,
+import { STATUS, STATUS_ORDER, YN, expandAll, scoreGroup, hasContent, itemsOf, needsPhoto, normAnswer, instTitle, baseName, OPERADORAS, uid, fmtDate, fmtTime, pad,
   TIPOS, tipoOf, versaoLabel, typeTag, ETAPAS, expandAcomp, itemCalc, groupCalc, overallCalc, snapshotOf, fmtPct, deltaLabel } from './model.js';
 import * as db from './db.js';
 import * as cloud from './cloud.js';
@@ -29,6 +29,14 @@ function askText(title, value = '') {
   return new Promise((resolve) => {
     d.addEventListener('close', () => resolve(d.returnValue === 'ok' ? i.value.trim() : null), { once: true });
     d.showModal(); setTimeout(() => { i.focus(); i.select(); }, 50);
+  });
+}
+
+function askLines(title, hint) {
+  const d = $('#dlgX'); $('#dlgXTitle').textContent = title; $('#dlgXHint').textContent = hint || ''; const i = $('#dlgXInput'); i.value = '';
+  return new Promise((resolve) => {
+    d.addEventListener('close', () => resolve(d.returnValue === 'ok' ? i.value.split(/\r?\n/).map((x) => x.trim()).filter(Boolean) : null), { once: true });
+    d.showModal(); setTimeout(() => i.focus(), 50);
   });
 }
 
@@ -129,7 +137,7 @@ function syncOperatorGroups() {
 
 function progressOf(d, inst, v = V) {
   if (d.tipo === 'acomp') { const c = groupCalc(v, d, inst); return { done: c.filled, total: c.total, pct: c.pct ?? 0, avanco: c.pct }; }
-  const st = d.items.filter((i) => i.tipo === 'status' || i.tipo === 'yn');
+  const st = itemsOf(d, inst).filter((i) => i.tipo === 'status' || i.tipo === 'yn');
   const done = st.filter((i) => inst.answers[i.key]).length;
   let total = st.length;
   if (!total) { // grupos só com campos numéricos
@@ -146,7 +154,7 @@ function overall(v = V) {
 }
 
 // ---------- layout (barra superior) ----------
-const APP_VERSION = '1.1.0'; // manter igual ao VERSION de sw.js
+const APP_VERSION = '1.2.0'; // manter igual ao VERSION de sw.js
 function setTop({ back, title, right = '' }) {
   $('#top').innerHTML = (back ? `<a class="icon-btn" href="${back}" aria-label="Voltar" style="text-decoration:none;display:grid;place-items:center">←</a>` : `<img src="assets/qmc-logo.png" alt="QMC">`) + `<h1>${E(title)}</h1><span class="ver">v${APP_VERSION}</span>${right}`;
 }
@@ -269,7 +277,7 @@ function ynHTML(key, val) {
 }
 function itemHTML(it, inst) {
   const a = inst.answers[it.key];
-  let h = `<div class="it" data-item="${E(it.key)}"><div class="q">${E(it.text)}</div>`;
+  let h = `<div class="it" data-item="${E(it.key)}"><div class="q">${E(it.text)}${it.custom ? ` <button type="button" class="btn danger small" style="min-height:30px;padding:2px 10px;margin-left:6px" data-xdel="${E(it.key)}">Remover</button>` : ''}</div>`;
   if (it.anexo && it.tipo !== 'yn' && !it.extra) h += `<div class="hint">📎 ${E(it.anexo)}</div>`;
   h += it.tipo === 'yn' ? ynHTML(it.key, a) : segHTML(it.key, a);
   if (it.tipo === 'yn' && a === 'sim' && it.anexo) h += `<div class="hint" style="margin-top:8px">📎 ${E(it.anexo)}</div>`;
@@ -285,6 +293,11 @@ function campoHTML(c, inst) {
   return `<div class="num" data-ck="${E(c.key)}"><div class="l">${E(c.label)}</div>
     <div class="unit"><input type="number" inputmode="decimal" step="any" data-nv="${E(c.key)}" value="${E(v.v ?? '')}">${c.unit ? `<span>${c.unit}</span>` : ''}</div>
     ${c.amperagem ? `<label class="diff ${warn ? 'warn' : ''}"><input type="checkbox" data-nd="${E(c.key)}" ${warn ? 'checked' : ''}> Valor difere do projeto (anexar foto/print de conformidade)</label>` : ''}</div>`;
+}
+
+function extrasHTML(inst) {
+  const ex = itemsOf({ items: [] }, inst);
+  return ex.length ? ex.map((it) => itemHTML(it, inst)).join('') : '<div class="muted">Nenhum item adicionado.</div>';
 }
 
 let curInst = null, curDef = null;
@@ -307,6 +320,10 @@ async function viewGroup(gid) {
       <div class="row" style="margin-bottom:6px"><button class="btn ghost small" data-act="allok">Marcar pendentes como OK</button></div>
       <div id="items">${d.items.map((it) => itemHTML(it, inst)).join('')}</div></div>` : ''}
     ${d.campos.length ? `<div class="card"><h2>${d.tipo === 'medicao' ? 'Medições' : 'Amperagens dos disjuntores'}</h2>${d.campos.map((c) => campoHTML(c, inst)).join('')}</div>` : ''}
+    <div class="card"><h2>Itens adicionais</h2>
+      <p class="muted" style="margin-top:-4px">Itens fora do padrão deste grupo (ex.: HBTS em plataforma elevada — escada fixa, guarda-corpo, linha de vida).</p>
+      <div id="xitems">${extrasHTML(inst)}</div>
+      <div class="row" style="margin-top:8px"><button class="btn teal small" data-act="addx">＋ Adicionar itens</button></div></div>
     <div class="card"><h2>Observação do grupo</h2><textarea data-obs placeholder="Observações gerais deste grupo (vai no slide do checklist)">${E(inst.obs)}</textarea></div>
     <div class="card"><h2>Fotos <span class="muted" style="text-transform:none;letter-spacing:0">(2 por slide)</span></h2>
       <div class="row" style="margin-bottom:12px">
@@ -384,7 +401,7 @@ function updateGroupProgress() {
   const p = progressOf(curDef, curInst);
   const el = $('#gprog'); if (!el) return;
   const sc = scoreGroup(curDef, curInst);
-  el.textContent = curDef.items.length ? `${p.done} de ${p.total} respondidos${sc.pct != null ? ` · conformidade ${sc.pct}%` : ''}` : `${p.done} de ${p.total} preenchidos`;
+  el.textContent = itemsOf(curDef, curInst).length ? `${p.done} de ${p.total} respondidos${sc.pct != null ? ` · conformidade ${sc.pct}%` : ''}` : `${p.done} de ${p.total} preenchidos`;
   const nd = $('#need'); if (nd) { const need = needsPhoto(curDef, curInst); nd.hidden = !need; if (need) nd.textContent = `📷 Há ${sc.nok} item(ns) “Não conf.” — foto de evidência obrigatória neste grupo.`; }
   const bar = $('#gbar'); bar.className = 'bar ' + (p.pct === 100 ? 'full' : ''); bar.firstElementChild.style.width = p.pct + '%';
 }
@@ -584,6 +601,12 @@ async function onClick(e) {
     if (label === null) return;
     V.groups.push(newInst(d, label)); touch(); refreshOverviewBits(); return;
   }
+  const xd = t.closest('[data-xdel]');
+  if (xd && curInst) {
+    if (!confirm('Remover este item adicional?')) return;
+    const k = xd.dataset.xdel; curInst.extras = (curInst.extras || []).filter((x) => x.k !== k); delete curInst.answers[k];
+    touch(); $('#xitems').innerHTML = extrasHTML(curInst); updateGroupProgress(); return;
+  }
   const pm = t.closest('[data-pm]');
   if (pm) {
     const i = curInst.photos.findIndex((p) => p.id === pm.dataset.pid); const j = pm.dataset.pm === 'up' ? i - 1 : i + 1;
@@ -604,6 +627,12 @@ async function onClick(e) {
       getGPS().then((g) => { if (g && V) { V.gps = g; touch(); refreshOverviewBits(); } else if (!g) toast('Localização não disponível — permita o acesso ao GPS'); });
       break;
     }
+    case 'addx': {
+      const lines = await askLines(`Adicionar itens — ${instTitle(curDef, curInst)}`, 'Um item por linha. Cada um terá OK / Não conf. / N/A.');
+      if (!lines?.length) break;
+      (curInst.extras ||= []).push(...lines.map((text) => ({ k: 'x' + uid().slice(0, 8), text })));
+      touch(); $('#xitems').innerHTML = extrasHTML(curInst); updateGroupProgress(); break;
+    }
     case 'nextver': nextVersion(); break;
     case 'install': deferredInstall?.prompt(); deferredInstall = null; route(); break;
     case 'login': toast('Abrindo login da Microsoft…', 4000); cloud.signIn().catch((e) => toast('Erro no login: ' + (e.errorCode ? e.errorCode + ' – ' : '') + (e.message || e), 12000)); break;
@@ -612,8 +641,8 @@ async function onClick(e) {
     case 'gps': { toast('Obtendo localização…', 1500); const g = await getGPS(); if (g) { V.gps = g; touch(); refreshOverviewBits(); toast('Localização atualizada'); } else toast('Não foi possível obter a localização'); break; }
     case 'rmcover': if (V.cover) { await removePhoto(V.cover.id); V.cover = null; touch(); viewVistoria(); } break;
     case 'allok':
-      for (const it of curDef.items) if (it.tipo === 'status' && !curInst.answers[it.key]) curInst.answers[it.key] = 'ok';
-      touch(); $('#items').innerHTML = curDef.items.map((it) => itemHTML(it, curInst)).join(''); updateGroupProgress(); break;
+      for (const it of itemsOf(curDef, curInst)) if (it.tipo === 'status' && !curInst.answers[it.key]) curInst.answers[it.key] = 'ok';
+      touch(); if ($('#items')) $('#items').innerHTML = curDef.items.map((it) => itemHTML(it, curInst)).join(''); $('#xitems').innerHTML = extrasHTML(curInst); updateGroupProgress(); break;
     case 'delv':
       if (confirm('Excluir esta vistoria? Isto também remove do OneDrive.')) {
         const v = V; V = null;

@@ -48,9 +48,15 @@ export function expandAll(checklist) {
   return checklist.grupos.map((g) => expandGroup(checklist, g));
 }
 
+/** Itens do modelo + itens adicionados em campo (inst.extras). */
+export function itemsOf(def, inst) {
+  const ex = (inst?.extras || []).map((x) => ({ key: x.k, text: x.text, anexo: null, tipo: 'status', extra: null, custom: true }));
+  return ex.length ? [...def.items, ...ex] : def.items;
+}
+
 export function scoreGroup(def, inst) {
   const c = { ok: 0, na: 0, nok: 0, pend: 0 };
-  for (const it of def.items) {
+  for (const it of itemsOf(def, inst)) {
     if (it.tipo !== 'status') continue;
     const a = normAnswer(inst.answers?.[it.key]);
     if (a && c[a] !== undefined) c[a]++; else c.pend++;
@@ -65,6 +71,7 @@ export function hasContent(def, inst) {
   if (inst.obs && inst.obs.trim()) return true;
   if ((inst.photos || []).length) return true;
   if (Object.keys(inst.answers || {}).length) return true;
+  if ((inst.extras || []).length) return true;
   if (Object.values(inst.qty || {}).some((q) => Object.values(q || {}).some((x) => String(x ?? '').trim() !== ''))) return true;
   return Object.values(inst.values || {}).some((v) => v && String(v.v ?? '').trim() !== '');
 }

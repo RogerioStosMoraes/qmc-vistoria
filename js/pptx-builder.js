@@ -1,6 +1,6 @@
 // Gera o relatório .pptx a partir do modelo QMC (template.pptx enxuto, sem slides).
 // Funciona no navegador e no Node (JSZip é injetado).
-import { STATUS, YN, normAnswer, expandGroup, scoreGroup, hasContent, instTitle, OPERADORAS, fmtDate, fmtTime,
+import { STATUS, YN, normAnswer, expandGroup, scoreGroup, hasContent, instTitle, itemsOf, OPERADORAS, fmtDate, fmtTime,
   tipoOf, versaoLabel, ETAPAS, expandAcomp, groupCalc, overallCalc, fmtPct, deltaLabel } from './model.js';
 
 const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
@@ -128,6 +128,13 @@ function buildRows(def, inst) {
       }
     }
   }
+  if ((inst.extras || []).length) {
+    rows.push({ kind: 'sub', text: 'Itens adicionais (fora do padrão)' });
+    for (const it of itemsOf({ items: [] }, inst)) {
+      const a = normAnswer(inst.answers?.[it.key]);
+      rows.push({ kind: 'item', text: it.text, st: a && STATUS[a] ? STATUS[a] : null });
+    }
+  }
   const vals = [];
   for (const c of def.campos) {
     const v = inst.values?.[c.key];
@@ -162,7 +169,7 @@ function rowToTr(r, d) {
 // ---------- slides ----------
 function headerStrip(s, def, inst, sc) {
   let t;
-  if (def.items.some((i) => i.tipo === 'status')) {
+  if (sc.total > 0) {
     const pct = sc.pct == null ? '—' : sc.pct + '%';
     t = [
       run('Conformidade: ', { sz: 900, b: true, color: TEAL, font: FONT }),
