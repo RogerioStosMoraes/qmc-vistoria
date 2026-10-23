@@ -3,6 +3,7 @@ import { STATUS, STATUS_ORDER, YN, expandAll, scoreGroup, hasContent, itemsOf, n
 import * as db from './db.js';
 import * as cloud from './cloud.js';
 import { buildPptx } from './pptx-builder.js';
+import { openEditor } from './editor.js';
 
 const $ = (s, r = document) => r.querySelector(s);
 const view = $('#view');
@@ -154,7 +155,7 @@ function overall(v = V) {
 }
 
 // ---------- layout (barra superior) ----------
-const APP_VERSION = '1.3.0'; // manter igual ao VERSION de sw.js
+const APP_VERSION = '1.4.0'; // manter igual ao VERSION de sw.js
 function setTop({ back, title, right = '' }) {
   $('#top').innerHTML = (back ? `<a class="icon-btn" href="${back}" aria-label="Voltar" style="text-decoration:none;display:grid;place-items:center">←</a>` : `<img src="assets/qmc-logo.png" alt="QMC">`) + `<h1>${E(title)}</h1><span class="ver">v${APP_VERSION}</span>${right}`;
 }
@@ -415,6 +416,7 @@ async function renderPhotos() {
     ${srcs[i] ? `<img src="${srcs[i]}" alt="Foto ${i + 1}">` : `<div class="muted" style="padding:40px;text-align:center;background:#eee">Foto ainda não baixada</div>`}
     <div class="b"><label class="f">Observação da foto ${i + 1}</label><textarea data-po="${p.id}" placeholder="O que esta foto mostra?">${E(p.obs)}</textarea>
     <div class="acts"><span class="n">Slide ${Math.floor(i / 2) + 1} · ${i % 2 ? 'direita' : 'esquerda'}</span>
+      <button class="btn teal small" data-pe="${p.id}">✏️ Editar</button>
       <button class="btn ghost small" data-pm="up" data-pid="${p.id}" ${i === 0 ? 'disabled' : ''}>↑</button>
       <button class="btn ghost small" data-pm="down" data-pid="${p.id}" ${i === ps.length - 1 ? 'disabled' : ''}>↓</button>
       <button class="btn danger small" data-pd="${p.id}">Excluir</button></div></div></div>`).join('');
@@ -431,6 +433,20 @@ async function addPhotos(files) {
     } catch (e) { console.error(e); toast('Não foi possível ler uma das fotos'); }
   }
   touch(); renderPhotos();
+}
+async function editPhoto(id) {
+  const rec = await db.getPhoto(id);
+  if (!rec?.blob) { toast('Foto ainda não baixada neste aparelho'); return; }
+  const res = await openEditor(rec.blob, { orig: rec.orig || null, askText });
+  if (!res) return;
+  const nid = uid(); // novo id: garante que os outros aparelhos baixem a versão editada
+  await db.putPhoto({ id: nid, vid: V.id, blob: res.blob, w: res.w, h: res.h, synced: false, orig: rec.orig || rec.blob });
+  const ph = curInst.photos.find((p) => p.id === id);
+  if (ph) { ph.id = nid; ph.w = res.w; ph.h = res.h; }
+  if (rec.synced) (V.removedPhotos ||= []).push(id);
+  await db.deletePhoto(id);
+  if (urls.has(id)) { URL.revokeObjectURL(urls.get(id)); urls.delete(id); }
+  touch(); renderPhotos(); toast('Foto editada');
 }
 async function removePhoto(id) {
   const rec = await db.getPhoto(id);
@@ -607,6 +623,8 @@ async function onClick(e) {
     const k = xd.dataset.xdel; curInst.extras = (curInst.extras || []).filter((x) => x.k !== k); delete curInst.answers[k];
     touch(); $('#xitems').innerHTML = extrasHTML(curInst); updateGroupProgress(); return;
   }
+  const pe = t.closest('[data-pe]');
+  if (pe && curInst) { editPhoto(pe.dataset.pe); return; }
   const pm = t.closest('[data-pm]');
   if (pm) {
     const i = curInst.photos.findIndex((p) => p.id === pm.dataset.pid); const j = pm.dataset.pm === 'up' ? i - 1 : i + 1;

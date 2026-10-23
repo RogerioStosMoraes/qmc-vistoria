@@ -11,7 +11,7 @@ Dois tipos de vistoria (botões na tela inicial):
 - Foto do empreendimento: enviada por você; vai para a capa do PPTX. Logos Vivo/Claro/TIM vêm do app.
 - 18 grupos de checklist (OK / Não conf. / N/A; foto obrigatória quando há "Não conf."), observação por grupo, amperagens e medições.
 - **Itens adicionais** em qualquer grupo (fora do padrão, ex.: HBTS em plataforma elevada: escada fixa, guarda-corpo, linha de vida): um item por linha, cada um com OK / Não conf. / N/A. Entram na conformidade, na regra de foto obrigatória e no PPTX.
-- Fotos por grupo, cada uma com observação própria. PPTX: capa + (checklist + evidências) por grupo, no máximo 2 fotos por slide.
+- Fotos por grupo, cada uma com observação própria e botão **✏️ Editar** (setas, retângulos, círculos, desenho livre e texto sobre a foto; a foto original fica guardada no aparelho para voltar atrás). PPTX: capa + (checklist + evidências) por grupo, no máximo 2 fotos por slide.
 
 **Acompanhamento** (instalado × projetado)
 - Cabeçalho igual + quantidades de projeto: setores, IDFs e Nanos (5G + 4G).

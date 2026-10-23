@@ -1,9 +1,9 @@
 // Service worker: guarda o app no aparelho para funcionar sem internet.
-const VERSION = 'v1.3.0';
+const VERSION = 'v1.4.0';
 const CACHE = 'qmc-vistoria-' + VERSION;
 const SHELL = [
   './', 'index.html', 'styles.css', 'config.js', 'manifest.webmanifest',
-  'js/app.js', 'js/model.js', 'js/db.js', 'js/cloud.js', 'js/pptx-builder.js',
+  'js/app.js', 'js/model.js', 'js/db.js', 'js/cloud.js', 'js/pptx-builder.js', 'js/editor.js',
   'vendor/jszip.min.js', 'vendor/msal-browser.min.js',
   'data/checklist.json', 'data/acompanhamento.json', 'assets/template.pptx', 'assets/qmc-logo.png',
   'assets/logos/vivo.png', 'assets/logos/claro.png', 'assets/logos/tim.png',
