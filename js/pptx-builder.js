@@ -1,7 +1,7 @@
 // Gera o relatório .pptx a partir do modelo QMC (template.pptx enxuto, sem slides).
 // Funciona no navegador e no Node (JSZip é injetado).
 import { STATUS, YN, normAnswer, expandGroup, scoreGroup, hasContent, instTitle, itemsOf, OPERADORAS, fmtDate, fmtTime,
-  tipoOf, versaoLabel, ETAPAS, expandAcomp, groupCalc, overallCalc, fmtPct, deltaLabel } from './model.js';
+  tipoOf, versaoLabel, ETAPAS, expandAcomp, ETAPA_ORDER, groupCalc, overallCalc, fmtPct, deltaLabel } from './model.js';
 
 const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
@@ -410,15 +410,17 @@ function acompGroupSlide(v, def, inst) {
   textBox(s, { x: FRAME.x + 100000, y: FRAME.y + 40000, w: FRAME.w - 200000, h: 260000, paras: [para(hs)], name: 'Resumo', anchor: 'ctr' });
 
   const prev = !!pg;
-  const rest = prev ? [700000, 1000000, 1000000, 1000000, 880000, 900000, 1350000] : [800000, 1100000, 1100000, 1100000, 980000, 1100000];
+  const stages = ETAPA_ORDER.filter((e) => def.items.some((it) => it.etapas.includes(e)));
+  const SW = stages.length > 3 ? 900000 : 1050000;
+  const rest = prev ? [620000, ...stages.map(() => SW), 800000, 880000, 1250000] : [700000, ...stages.map(() => SW), 920000, 1000000];
   const total = FRAME.w - 200000;
   const colW = [total - rest.reduce((a, b) => a + b, 0), ...rest];
   const sz = 1200, rowH = 410000;
   const H = (t, algn = 'ctr') => cell(t, { sz: 1100, fill: TEAL, color: 'FFFFFF', b: true, algn });
-  const rows = [{ h: 360000, cells: [H('Item', 'l'), H('Projeto'), H('Instalado'), H('Fusionado'), H('Conectado'), H('Pendente'), H('Avanço'), ...(prev ? [H(`vs ${versaoLabel(v.prev)}`)] : [])] }];
+  const rows = [{ h: 360000, cells: [H('Item', 'l'), H('Projeto'), ...stages.map((e) => H(ETAPAS[e])), H('Pendente'), H('Avanço'), ...(prev ? [H(`vs ${versaoLabel(v.prev)}`)] : [])] }];
   for (const { it, c } of gc.items) {
     const cells = [cell(it.text, { sz, b: true }), cell(c.proj != null ? String(c.proj) : '—', { sz, algn: 'ctr', b: true })];
-    for (const e of ['inst', 'fus', 'conec']) {
+    for (const e of stages) {
       if (!it.etapas.includes(e)) { cells.push(cell('—', { sz, algn: 'ctr', color: 'B5B5B5', fill: 'F7F7F7' })); continue; }
       const val = c.vals[e];
       if (val == null) { cells.push(cell('–', { sz, algn: 'ctr', color: '939598' })); continue; }

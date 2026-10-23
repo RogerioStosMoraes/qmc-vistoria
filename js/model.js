@@ -126,8 +126,8 @@ export const versaoLabel = (v) => `v${v.versao || 1}.0`;
 export function typeTag(v) { return tipoOf(v) === 'acomp' ? `Acompanhamento ${versaoLabel(v)}` : ''; }
 
 // ---------- acompanhamento (instalado x projetado) ----------
-export const ETAPAS = { inst: 'Instalado', fus: 'Fusionado', conec: 'Conectado' };
-export const ETAPA_ORDER = ['inst', 'fus', 'conec'];
+export const ETAPAS = { inst: 'Instalado', fus: 'Fusionado', conec: 'Conectado', energ: 'Energia' };
+export const ETAPA_ORDER = ['inst', 'fus', 'conec', 'energ'];
 
 export function expandAcomp(cfg) {
   return cfg.grupos.map((g) => ({
@@ -148,14 +148,13 @@ export function itemCalc(v, it, q = {}) {
   const vals = {}, pcts = {};
   let any = false;
   for (const e of it.etapas) { vals[e] = num(q[e]); if (vals[e] !== null) any = true; }
-  const last = it.etapas[it.etapas.length - 1];
   let pct = null;
   if (proj && proj > 0 && any) {
     let sum = 0;
     for (const e of it.etapas) { const r = Math.min(1, (vals[e] ?? 0) / proj); pcts[e] = Math.round(r * 100); sum += r; }
     pct = Math.round((sum / it.etapas.length) * 100);
   }
-  const pend = proj != null ? Math.max(0, proj - (vals[last] ?? 0)) : null;
+  const pend = proj != null ? Math.max(0, proj - Math.min(...it.etapas.map((e) => vals[e] ?? 0))) : null;
   return { proj, vals, pcts, pct, pend, filled: any, semProjeto: any && !(proj > 0) };
 }
 export function groupCalc(v, def, inst) {

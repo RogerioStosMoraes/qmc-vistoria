@@ -7,14 +7,14 @@
   ],
   "grupos": [
     { "id": "hbts", "grupo": "HBTS", "itens": [
-      { "item": "Racks", "etapas": ["inst", "conec"] },
+      { "item": "Racks", "etapas": ["inst", "conec", "energ"] },
       { "item": "SubRacks", "etapas": ["inst", "conec"] },
       { "item": "Cards POI", "etapas": ["inst", "conec"] },
       { "item": "DGO 96", "etapas": ["inst", "conec"] },
       { "item": "AUs", "etapas": ["inst", "conec"] }
     ] },
     { "id": "idf", "grupo": "IDF", "itens": [
-      { "item": "IDFs", "etapas": ["inst"], "proj_de": "qtdIdfs" },
+      { "item": "IDFs", "etapas": ["inst", "energ"], "proj_de": "qtdIdfs" },
       { "item": "EUs", "etapas": ["inst", "conec"] },
       { "item": "DIO 12", "etapas": ["inst", "fus", "conec"] },
       { "item": "FOs 48", "etapas": ["inst", "fus", "conec"] }
