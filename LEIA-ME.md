@@ -15,6 +15,8 @@ Dois tipos de vistoria (botões na tela inicial):
 
 **Acompanhamento** (instalado × projetado)
 - Cabeçalho igual + quantidades de projeto: setores, IDFs e Nanos (5G + 4G).
+- **Quadros elétricos** (grupo próprio, um subgrupo por quadro): proprietário (QMC, Vivo, Claro…), ação (instalar/substituir), Instalado / Conectado / Energizado, cabos instalados (unidades ou metros — informativo) e observação para divergências de disjuntor, cabos etc.
+- **IDFs**: grupo "IDF" com a quantidade (instalado/energia) e um subgrupo por IDF com EUs, DIO 12 e FOs 48. **FOs 48** e **Cabo híbrido** têm quantidade **e** metragem (a metragem pesa o avanço da instalação; a quantidade liga com fusão/conexão). No cabo híbrido, o check **Pré-conectorizado** tira a fusão do cálculo.
 - Grupos HBTS, IDF e Nanos (N3RU): para cada item informa-se Projeto, Instalado, Fusionado e/ou Conectado; o app calcula o % de cada etapa, o avanço do item, do grupo e o geral.
 - Avanço do item = média das etapas (instalado/projeto, fusionado/projeto, conectado/projeto). Avanço do grupo = média dos itens. Avanço geral = média dos grupos.
 - "Criar próxima vistoria" gera a v2.0, v3.0… com o cabeçalho já preenchido e compara com a anterior (item, grupo e geral).

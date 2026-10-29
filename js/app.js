@@ -1,5 +1,5 @@
 import { STATUS, STATUS_ORDER, YN, expandAll, scoreGroup, hasContent, itemsOf, needsPhoto, normAnswer, instTitle, baseName, OPERADORAS, uid, fmtDate, fmtTime, pad,
-  TIPOS, tipoOf, versaoLabel, typeTag, ETAPAS, expandAcomp, itemCalc, groupCalc, overallCalc, snapshotOf, fmtPct, deltaLabel } from './model.js';
+  TIPOS, tipoOf, versaoLabel, typeTag, ETAPAS, expandAcomp, instKey, quadroCalc, QUADRO_ETAPAS, etapasOf, itemCalc, groupCalc, overallCalc, snapshotOf, fmtPct, deltaLabel } from './model.js';
 import * as db from './db.js';
 import * as cloud from './cloud.js';
 import { buildPptx } from './pptx-builder.js';
@@ -125,6 +125,15 @@ function newVistoria(tipo = 'prehof') {
   return v;
 }
 
+// v1.4 -> v1.5: EUs / DIO 12 / FOs 48 saíram do grupo "IDFs" e foram para o subgrupo por IDF
+function migrateAcomp(v) {
+  if (v.tipo !== 'acomp' || !acompMap.has('idf_det')) return false;
+  const idf = v.groups.find((g) => g.groupId === 'idf'); if (!idf) return false;
+  const mv = ['eus', 'dio-12', 'fos-48'].filter((k) => idf.qty?.[k]); if (!mv.length) return false;
+  const det = newInst(acompMap.get('idf_det'), 'IDF 1');
+  for (const k of mv) { det.qty[k] = idf.qty[k]; delete idf.qty[k]; }
+  v.groups.push(det); v.dirty = true; return true;
+}
 function opLabel(key) { return OPERADORAS[key]?.nome || key; }
 function syncOperatorGroups() {
   if (isAcomp()) return;
@@ -155,7 +164,7 @@ function overall(v = V) {
 }
 
 // ---------- layout (barra superior) ----------
-const APP_VERSION = '1.4.0'; // manter igual ao VERSION de sw.js
+const APP_VERSION = '1.5.0'; // manter igual ao VERSION de sw.js
 function setTop({ back, title, right = '' }) {
   $('#top').innerHTML = (back ? `<a class="icon-btn" href="${back}" aria-label="Voltar" style="text-decoration:none;display:grid;place-items:center">←</a>` : `<img src="assets/qmc-logo.png" alt="QMC">`) + `<h1>${E(title)}</h1><span class="ver">v${APP_VERSION}</span>${right}`;
 }
@@ -248,16 +257,17 @@ function groupsHTML() {
   for (const d of defsOf()) {
     const ins = instsOf(d);
     if (isUnique(d)) { if (ins[0]) out += `<div class="gh" style="display:none"></div>` + grpRow(d, ins[0]); continue; }
-    out += `<div class="gh"><h3>${E(d.grupo)}</h3><button class="btn ghost small" data-add="${d.id}">＋ Adicionar</button></div>`;
-    out += ins.length ? ins.map((i) => grpRow(d, i)).join('') : `<div class="muted" style="margin:-2px 0 8px 2px">Nenhum adicionado.</div>`;
+    out += `<div class="gh"><h3>${E(d.tipo === 'acomp' ? d.tituloLista : d.grupo)}</h3><button class="btn ghost small" data-add="${d.id}">＋ ${E(d.tipo === 'acomp' ? d.rotuloAdd : 'Adicionar')}</button></div>`;
+    out += ins.length ? ins.map((i) => grpRow(d, i)).join('') : `<div class="muted" style="margin:-2px 0 8px 2px">${E(d.dica || 'Nenhum adicionado.')}</div>`;
   }
   return `<div class="card"><h2>Grupos do checklist</h2>${out}</div>`;
 }
 function grpRow(d, inst) {
   const p = progressOf(d, inst);
   const ph = inst.photos.length;
-  const prevG = V.prev?.groups?.[d.id];
-  const info = d.tipo === 'acomp' ? `avanço ${fmtPct(p.avanco)}${prevG ? ` (ant. ${fmtPct(prevG.pct)})` : ''} · ${p.done}/${p.total} itens` : `${p.done}/${p.total}`;
+  const prevG = V.prev?.groups?.[instKey(d, inst)];
+  const info = d.modo === 'quadro' ? `${inst.quadro?.dono || '—'} · ${inst.quadro?.acao || ''} · avanço ${fmtPct(p.avanco)}${prevG ? ` (ant. ${fmtPct(prevG.pct)})` : ''}`
+    : d.tipo === 'acomp' ? `avanço ${fmtPct(p.avanco)}${prevG ? ` (ant. ${fmtPct(prevG.pct)})` : ''} · ${p.done}/${p.total} itens` : `${p.done}/${p.total}`;
   return `<a class="grp ${inst.na ? 'na' : ''}" href="#/v/${V.id}/g/${inst.gid}"><div class="grow"><div class="t">${E(instTitle(d, inst))}</div>
     <div class="s">${inst.na ? 'Não se aplica' : `${info} · ${ph} foto${ph === 1 ? '' : 's'}`}${needsPhoto(d, inst) ? ' · <b style="color:var(--nok)">foto obrigatória</b>' : ''}</div>
     ${inst.na ? '' : `<div class="bar ${p.pct === 100 ? 'full' : ''}"><i style="width:${p.pct}%"></i></div>`}</div><span class="chev">›</span></a>`;
@@ -341,24 +351,29 @@ async function viewGroup(gid) {
 // ---- grupo de acompanhamento (instalado x projetado) ----
 const qField = (key, f, label, val, ph = '') => `<label class="qf"><span>${label}</span><input type="number" inputmode="numeric" min="0" step="1" data-q="${E(key)}|${f}" value="${E(val ?? '')}" placeholder="${E(ph)}"></label>`;
 function prevLine(it) {
-  const pi = V.prev?.groups?.[curDef.id]?.items?.[it.key];
+  const pi = V.prev?.groups?.[instKey(curDef, curInst)]?.items?.[it.key];
   if (!pi) return '';
-  const parts = [`proj ${pi.proj ?? '—'}`, ...it.etapas.map((e) => `${ETAPAS[e].toLowerCase()} ${pi.vals?.[e] ?? '—'}`)];
+  const parts = [`proj ${pi.proj ?? '—'}${pi.projM != null ? ` (${pi.projM} m)` : ''}`, ...it.etapas.map((e) => `${ETAPAS[e].toLowerCase()} ${pi.vals?.[e] ?? '—'}${e === 'inst' && pi.instM != null ? ` (${pi.instM} m)` : ''}`)];
   return `<div class="prev">Anterior (${versaoLabel(V.prev)}): ${parts.join(' · ')}${pi.pct != null ? ` — ${pi.pct}%` : ''}</div>`;
 }
+const fmtM = (n) => String(Math.round(n * 100) / 100).replace('.', ',');
 function qSubHTML(it, c) {
   if (!c.filled) return '<span class="muted">Preencha as quantidades.</span>';
   if (c.semProjeto) return '<span style="color:var(--nok);font-weight:600">Informe a quantidade de projeto.</span>';
-  const parts = it.etapas.map((e) => `${ETAPAS[e]} <b>${c.pcts[e] ?? 0}%</b>`);
-  return `${parts.join(' · ')}${c.pend ? ` · faltam <b>${c.pend}</b>` : ' · <b style="color:var(--ok)">concluído</b>'}`;
+  const parts = c.etapas.map((e) => `${ETAPAS[e]} <b>${c.pcts[e] ?? 0}%</b>${e === 'inst' && c.usaMetros ? ` <span class="muted">(${fmtM(c.instM)}/${fmtM(c.projM)} m)</span>` : ''}`);
+  return `${parts.join(' · ')}${c.precon ? ' · <span class="muted">sem fusão</span>' : ''}${c.pend ? ` · faltam <b>${c.pend}</b>` : ' · <b style="color:var(--ok)">concluído</b>'}`;
 }
 function qItemHTML(it, inst) {
   const q = inst.qty?.[it.key] || {};
   const c = itemCalc(V, it, q);
   const defProj = it.projDe ? V.header[it.projDe] : '';
+  const fields = [['proj', it.metragem ? 'Projeto (qtd)' : 'Projeto', defProj !== '' && defProj != null ? String(defProj) : '']];
+  if (it.metragem) fields.push(['projM', 'Projeto (m)', '']);
+  for (const e of c.etapas) { fields.push([e, ETAPAS[e] + (it.metragem && e === 'inst' ? ' (qtd)' : ''), '']); if (it.metragem && e === 'inst') fields.push(['instM', 'Instalado (m)', '']); }
   return `<div class="qi" data-qi="${E(it.key)}"><div class="qh"><b>${E(it.text)}</b><span class="badge ${c.pct === 100 ? 'done' : 'go'}" data-qpct>${fmtPct(c.pct)}</span></div>
     ${it.dica ? `<div class="hint">💡 ${E(it.dica)}</div>` : ''}
-    <div class="qgrid">${qField(it.key, 'proj', 'Projeto', q.proj, defProj !== '' && defProj != null ? String(defProj) : '')}${it.etapas.map((e) => qField(it.key, e, ETAPAS[e], q[e])).join('')}</div>
+    ${it.preconect ? `<label class="qchk"><input type="checkbox" data-qchk="${E(it.key)}|precon" ${q.precon ? 'checked' : ''}> Pré-conectorizado (não precisa de fusão)</label>` : ''}
+    <div class="qgrid">${fields.map(([f, l, ph]) => qField(it.key, f, l, q[f], ph)).join('')}</div>
     <div class="qs" data-qsub>${qSubHTML(it, c)}</div>${prevLine(it)}</div>`;
 }
 function refreshQItem(key) {
@@ -368,10 +383,27 @@ function refreshQItem(key) {
   const b = box.querySelector('[data-qpct]'); b.textContent = fmtPct(c.pct); b.className = 'badge ' + (c.pct === 100 ? 'done' : 'go');
   box.querySelector('[data-qsub]').innerHTML = qSubHTML(it, c);
 }
+function quadroHTML(inst) {
+  const q = inst.quadro ||= { dono: acompCfg.proprietarios_quadro[0], acao: 'Instalar', unid: 'un' };
+  const pqq = V.prev?.groups?.[instKey(curDef, inst)]?.quadro; const pq = pqq?.flags;
+  const opts = [...new Set([...acompCfg.proprietarios_quadro, q.dono].filter(Boolean))];
+  const tg = (k, l) => `<label class="tg ${q[k] ? 'on' : ''}"><input type="checkbox" data-qflag="${k}" ${q[k] ? 'checked' : ''}><span>${l}</span>${pq ? `<small>ant.: ${pq[k] ? 'sim' : 'não'}</small>` : ''}</label>`;
+  return `<div class="card"><h2>Quadro elétrico</h2>
+    <label class="f">Identificação</label><input type="text" data-qlabel value="${E(inst.label)}">
+    <div class="qgrid" style="margin-top:10px">
+      <label class="qf"><span>De quem é o quadro</span><select data-qd="dono">${opts.map((o) => `<option ${o === q.dono ? 'selected' : ''}>${E(o)}</option>`).join('')}</select></label>
+      <label class="qf"><span>Ação</span><select data-qd="acao">${['Instalar', 'Substituir'].map((o) => `<option ${o === q.acao ? 'selected' : ''}>${o}</option>`).join('')}</select></label></div>
+    <div class="tgs">${tg('inst', 'Instalado')}${tg('conec', 'Conectado')}${tg('energ', 'Energizado')}</div></div>
+  <div class="card"><h2>Cabos instalados</h2>
+    <div class="qgrid"><label class="qf"><span>Quantidade</span><input type="number" inputmode="decimal" min="0" step="any" data-qd="cabos" value="${E(q.cabos ?? '')}"></label>
+      <label class="qf"><span>Unidade</span><select data-qd="unid"><option value="un" ${q.unid !== 'm' ? 'selected' : ''}>unidades</option><option value="m" ${q.unid === 'm' ? 'selected' : ''}>metros</option></select></label></div>
+    ${pqq?.cabos != null ? `<div class="prev">Anterior: ${E(pqq.cabos)} ${pqq.unid === 'm' ? 'm' : 'un'}</div>` : ''}
+    <p class="muted">Informativo — não entra na porcentagem. Use a observação abaixo para divergências de disjuntor, cabos etc.</p></div>`;
+}
 function updateAcompGroup() {
   const el = $('#gprog'); if (!el) return;
-  const c = groupCalc(V, curDef, curInst); const pg = V.prev?.groups?.[curDef.id];
-  el.textContent = `Avanço do grupo: ${fmtPct(c.pct)} · ${c.filled} de ${c.total} itens preenchidos${pg ? ` · ${versaoLabel(V.prev)}: ${fmtPct(pg.pct)} ${deltaLabel(c.pct, pg.pct)}` : ''}`;
+  const c = groupCalc(V, curDef, curInst); const pg = V.prev?.groups?.[instKey(curDef, curInst)];
+  el.textContent = `Avanço do grupo: ${fmtPct(c.pct)} · ${curDef.modo === 'quadro' ? '' : `${c.filled} de ${c.total} itens preenchidos`}${pg ? ` · ${versaoLabel(V.prev)}: ${fmtPct(pg.pct)} ${deltaLabel(c.pct, pg.pct)}` : ''}`;
   const bar = $('#gbar'); bar.className = 'bar ' + (c.pct === 100 ? 'full' : ''); bar.firstElementChild.style.width = (c.pct ?? 0) + '%';
 }
 function viewGroupAcomp(inst, d) {
@@ -381,9 +413,9 @@ function viewGroupAcomp(inst, d) {
     <label class="row" style="gap:8px;font-size:14px"><input type="checkbox" id="naChk" ${inst.na ? 'checked' : ''} style="width:20px;height:20px"> Não se aplica</label>
   </div>
   <div id="body" ${inst.na ? 'hidden' : ''}>
-    <div class="card"><h2>Quantidades</h2>
+    ${d.modo === 'quadro' ? quadroHTML(inst) : `<div class="card"><h2>Quantidades</h2>
       <p class="muted" style="margin-top:-4px">Informe o <b>projeto</b> e quanto já foi <b>instalado / fusionado / conectado</b>. O avanço é calculado automaticamente.</p>
-      <div id="items">${d.items.map((it) => qItemHTML(it, inst)).join('')}</div></div>
+      <div id="items">${d.items.map((it) => qItemHTML(it, inst)).join('')}</div></div>`}
     <div class="card"><h2>Observação do grupo</h2><textarea data-obs placeholder="Observações gerais deste grupo (vai no slide da tabela)">${E(inst.obs)}</textarea></div>
     <div class="card"><h2>Fotos <span class="muted" style="text-transform:none;letter-spacing:0">(2 por slide)</span></h2>
       <div class="row" style="margin-bottom:12px">
@@ -393,6 +425,7 @@ function viewGroupAcomp(inst, d) {
       <div class="photos" id="photos"></div>
     </div>
   </div>
+  ${d.multi ? `<div class="card"><button class="btn danger small" data-act="rmgrp">Remover ${E(d.modo === 'quadro' ? 'este quadro' : 'este item')}</button></div>` : ''}
   <div class="sticky"><a class="btn teal" style="text-decoration:none;text-align:center;display:block;padding-top:14px" href="#/v/${V.id}">Concluir grupo ✓</a></div>`;
   updateAcompGroup();
   renderPhotos();
@@ -462,7 +495,7 @@ function collectWarnings() {
   if (isAcomp()) {
     for (const x of overallCalc(V, acompMap).groups) {
       if (!hasContent(x.d, x.g)) continue;
-      for (const { it, c } of x.items) if (c.semProjeto) w.push(`${x.d.grupo} – ${it.text}: informe a quantidade de projeto (o item não entra no cálculo)`);
+      for (const { it, c } of x.items) if (c.semProjeto) w.push(`${instTitle(x.d, x.g)} – ${it.text}: informe a quantidade de projeto (o item não entra no cálculo)`);
     }
     return { w, block, pend };
   }
@@ -514,9 +547,9 @@ async function viewFinishAcomp() {
   const o = overallCalc(V, acompMap);
   const rows = [], vazios = [];
   for (const x of o.groups) {
-    if (!hasContent(x.d, x.g)) { vazios.push(x.d.grupo); continue; }
-    const pg = V.prev?.groups?.[x.d.id];
-    rows.push(`<tr><td>${E(x.d.grupo)}</td><td class="c"><b>${fmtPct(x.pct)}</b></td>${V.prev ? `<td class="c">${fmtPct(pg?.pct)}</td><td class="c">${E(deltaLabel(x.pct, pg?.pct))}</td>` : ''}<td class="c">${x.filled}/${x.total}</td><td class="c">${x.g.photos.length}</td></tr>`);
+    if (!hasContent(x.d, x.g)) { vazios.push(instTitle(x.d, x.g)); continue; }
+    const pg = V.prev?.groups?.[instKey(x.d, x.g)];
+    rows.push(`<tr><td>${E(instTitle(x.d, x.g))}</td><td class="c"><b>${fmtPct(x.pct)}</b></td>${V.prev ? `<td class="c">${fmtPct(pg?.pct)}</td><td class="c">${E(deltaLabel(x.pct, pg?.pct))}</td>` : ''}<td class="c">${x.filled}/${x.total}</td><td class="c">${x.g.photos.length}</td></tr>`);
   }
   const { w } = collectWarnings();
   const canShare = !!(navigator.canShare && navigator.share);
@@ -546,6 +579,13 @@ async function nextVersion() {
   n.prev = snapshotOf(V, acompMap);
   n.header = { ...V.header, operadoras: [...(V.header.operadoras || [])] };
   if (V.gps) n.gps = { ...V.gps };
+  for (const g of V.groups) { // grupos múltiplos (quadros, IDFs): mantém identificação e projeto
+    const d = acompMap.get(g.groupId); if (!d?.multi) continue;
+    const ni = newInst(d, g.label);
+    if (g.quadro) ni.quadro = { dono: g.quadro.dono, acao: g.quadro.acao, unid: g.quadro.unid || 'un' };
+    for (const [k, q] of Object.entries(g.qty || {})) { const o = {}; for (const f of ['proj', 'projM', 'precon']) if (q[f] != null) o[f] = q[f]; if (Object.keys(o).length) ni.qty[k] = o; }
+    n.groups.push(ni);
+  }
   if (V.cover) {
     const rec = await db.getPhoto(V.cover.id);
     if (rec?.blob) { const id = uid(); await db.putPhoto({ id, vid: n.id, blob: rec.blob, w: V.cover.w, h: V.cover.h, synced: false }); n.cover = { id, w: V.cover.w, h: V.cover.h }; }
@@ -612,10 +652,14 @@ async function onClick(e) {
   }
   const add = t.closest('[data-add]');
   if (add) {
-    const d = defMap.get(add.dataset.add); const n = instsOf(d).length + 1;
-    const label = await askText(`Identificação (${d.grupo})`, `${DEFAULT_LABEL[d.id] || 'Item'} ${n}`);
+    const d = dmOf().get(add.dataset.add); const n = instsOf(d).length + 1;
+    const label = await askText(`Identificação (${d.grupo})`, `${d.tipo === 'acomp' ? d.labelPadrao : (DEFAULT_LABEL[d.id] || 'Item')} ${n}`);
     if (label === null) return;
-    V.groups.push(newInst(d, label)); touch(); refreshOverviewBits(); return;
+    const ni = newInst(d, label);
+    if (d.modo === 'quadro') ni.quadro = { dono: acompCfg.proprietarios_quadro[0], acao: 'Instalar', unid: 'un' };
+    V.groups.push(ni); touch(); refreshOverviewBits();
+    if (d.tipo === 'acomp') location.hash = `#/v/${V.id}/g/${ni.gid}`;
+    return;
   }
   const xd = t.closest('[data-xdel]');
   if (xd && curInst) {
@@ -652,6 +696,11 @@ async function onClick(e) {
       touch(); $('#xitems').innerHTML = extrasHTML(curInst); updateGroupProgress(); break;
     }
     case 'nextver': nextVersion(); break;
+    case 'rmgrp': {
+      if (!confirm(`Remover "${instTitle(curDef, curInst)}" e suas fotos?`)) break;
+      for (const p of curInst.photos) await removePhoto(p.id);
+      V.groups = V.groups.filter((g) => g.gid !== curInst.gid); touch(); location.hash = `#/v/${V.id}`; break;
+    }
     case 'install': deferredInstall?.prompt(); deferredInstall = null; route(); break;
     case 'login': toast('Abrindo login da Microsoft…', 4000); cloud.signIn().catch((e) => toast('Erro no login: ' + (e.errorCode ? e.errorCode + ' – ' : '') + (e.message || e), 12000)); break;
     case 'logout': if (confirm('Sair da conta Microsoft? As vistorias continuam no aparelho.')) cloud.signOut(); break;
@@ -691,11 +740,20 @@ view.addEventListener('input', (e) => {
     if (t.value === '') delete o[f]; else o[f] = t.value;
     touch(); refreshQItem(k); updateAcompGroup();
   }
+  else if (t.dataset.qd) { const q = (curInst.quadro ||= {}); q[t.dataset.qd] = t.value; touch(); }
+  else if (t.dataset.qlabel !== undefined) { curInst.label = t.value; touch(); $('#top h1').textContent = instTitle(curDef, curInst); }
   else if (t.dataset.nv) { const v = (curInst.values[t.dataset.nv] ||= {}); v.v = t.value; touch(); updateGroupProgress(); }
 });
 view.addEventListener('change', async (e) => {
   const t = e.target;
   if (t.id === 'naChk') { curInst.na = t.checked; $('#body').hidden = t.checked; touch(); }
+  else if (t.dataset.qd) { (curInst.quadro ||= {})[t.dataset.qd] = t.value; touch(); updateAcompGroup(); }
+  else if (t.dataset.qflag) { (curInst.quadro ||= {})[t.dataset.qflag] = t.checked; t.closest('.tg').classList.toggle('on', t.checked); touch(); updateAcompGroup(); }
+  else if (t.dataset.qchk) {
+    const [k, f] = t.dataset.qchk.split('|'); const o = ((curInst.qty ||= {})[k] ||= {});
+    if (t.checked) o[f] = true; else delete o[f];
+    touch(); const it = curDef.items.find((i) => i.key === k); t.closest('.qi').outerHTML = qItemHTML(it, curInst); updateAcompGroup();
+  }
   else if (t.dataset.nd) { const v = (curInst.values[t.dataset.nd] ||= {}); v.diff = t.checked; t.closest('.diff').classList.toggle('warn', t.checked); touch(); }
   else if (t.id === 'camIn' || t.id === 'galIn') { await addPhotos([...t.files]); t.value = ''; }
   else if (t.id === 'coverIn' && t.files[0]) {
@@ -723,6 +781,7 @@ async function route() {
   if (r.v === 'home') return viewHome();
   if (!V || V.id !== r.id) V = await db.getVistoria(r.id);
   if (!V) { location.hash = '#/'; return; }
+  if (migrateAcomp(V)) db.putVistoria(V);
   if (r.v === 'vistoria') return viewVistoria();
   if (r.v === 'group') return viewGroup(r.gid);
   if (r.v === 'finish') return viewFinish();

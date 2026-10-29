@@ -177,3 +177,10 @@ body.ed-open { overflow: hidden; }
 .edc { width: 32px; height: 32px; border-radius: 50%; border: 2px solid #34464f; cursor: pointer; }
 .edc.on { border-color: #fff; box-shadow: 0 0 0 2px var(--orange); }
 .ed-sep { width: 1px; height: 28px; background: #34464f; margin: 0 2px; }
+.tgs{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.tg{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;min-height:56px;padding:8px;border:2px solid var(--line,#cfd6dc);border-radius:12px;font-weight:600;cursor:pointer;text-align:center;background:#fff}
+.tg input{position:absolute;opacity:0;pointer-events:none}
+.tg small{font-weight:400;color:#6b7780;font-size:11px}
+.tg.on{background:var(--teal,#0e7c86);border-color:var(--teal,#0e7c86);color:#fff}.tg.on small{color:#e6f4f5}
+.qchk{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:14px}.qchk input{width:20px;height:20px}
+.qf select,input[data-qlabel]{width:100%;padding:10px;border:1px solid #cfd6dc;border-radius:8px;font-size:16px;background:#fff}

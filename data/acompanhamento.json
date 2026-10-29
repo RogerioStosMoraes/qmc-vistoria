@@ -5,6 +5,7 @@
     { "campo": "qtdIdfs", "rotulo": "Qtd. de IDFs", "dica": "Considerar o total de IDFs 5G + 4G" },
     { "campo": "qtdNanos", "rotulo": "Qtd. de Nanos", "dica": "Considerar o total de Nanos 5G + 4G" }
   ],
+  "proprietarios_quadro": ["QMC", "Vivo", "Claro", "TIM", "Outro"],
   "grupos": [
     { "id": "hbts", "grupo": "HBTS", "itens": [
       { "item": "Racks", "etapas": ["inst", "conec", "energ"] },
@@ -13,14 +14,20 @@
       { "item": "DGO 96", "etapas": ["inst", "conec"] },
       { "item": "AUs", "etapas": ["inst", "conec"] }
     ] },
+    { "id": "quadros", "grupo": "Quadros elétricos", "modo": "quadro", "instancias": "múltipla", "label_padrao": "Quadro", "adicionar": "Adicionar quadro",
+      "dica": "Adicione cada quadro a instalar/substituir e informe de quem é (QMC, Vivo, Claro…)." },
     { "id": "idf", "grupo": "IDF", "itens": [
-      { "item": "IDFs", "etapas": ["inst", "energ"], "proj_de": "qtdIdfs" },
-      { "item": "EUs", "etapas": ["inst", "conec"] },
-      { "item": "DIO 12", "etapas": ["inst", "fus", "conec"] },
-      { "item": "FOs 48", "etapas": ["inst", "fus", "conec"] }
+      { "item": "IDFs", "etapas": ["inst", "energ"], "proj_de": "qtdIdfs" }
     ] },
+    { "id": "idf_det", "grupo": "IDF", "pai": "idf", "so_label": true, "titulo_lista": "IDFs — detalhamento por IDF", "instancias": "múltipla", "label_padrao": "IDF", "adicionar": "Adicionar IDF",
+      "dica": "Adicione um subgrupo para cada IDF.",
+      "itens": [
+        { "item": "EUs", "etapas": ["inst", "conec"] },
+        { "item": "DIO 12", "etapas": ["inst", "fus", "conec"] },
+        { "item": "FOs 48", "etapas": ["inst", "fus", "conec"], "metragem": true, "dica": "Quantidade (liga com a fusão) e metragem (pesa o avanço da instalação)" }
+      ] },
     { "id": "nanos", "grupo": "Nanos (N3RU)", "itens": [
-      { "item": "Cabo híbrido (CTO-DGO)", "etapas": ["inst", "fus"], "proj_de": "qtdNanos", "dica": "Considerar a quantidade de Nanos" },
+      { "item": "Cabo híbrido (CTO-DGO)", "etapas": ["inst", "fus"], "proj_de": "qtdNanos", "metragem": true, "preconectorizado": true, "dica": "Considerar a quantidade de Nanos. Se for pré-conectorizado, não há fusão." },
       { "item": "Nanos", "etapas": ["inst", "conec"], "proj_de": "qtdNanos" }
     ] }
   ]

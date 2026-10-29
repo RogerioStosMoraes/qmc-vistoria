@@ -1,7 +1,7 @@
 // Gera o relatório .pptx a partir do modelo QMC (template.pptx enxuto, sem slides).
 // Funciona no navegador e no Node (JSZip é injetado).
 import { STATUS, YN, normAnswer, expandGroup, scoreGroup, hasContent, instTitle, itemsOf, OPERADORAS, fmtDate, fmtTime,
-  tipoOf, versaoLabel, ETAPAS, expandAcomp, ETAPA_ORDER, groupCalc, overallCalc, fmtPct, deltaLabel } from './model.js';
+  tipoOf, versaoLabel, ETAPAS, expandAcomp, ETAPA_ORDER, groupCalc, instKey, quadroCalc, QUADRO_ETAPAS, overallCalc, fmtPct, deltaLabel } from './model.js';
 
 const NS_A = 'http://schemas.openxmlformats.org/drawingml/2006/main';
 const NS_R = 'http://schemas.openxmlformats.org/officeDocument/2006/relationships';
@@ -96,7 +96,8 @@ const TABLE_H = 3570000;
 function cell(text, { fill, color = GREY, b = false, algn = 'l', sz = 800, bottom = 'E3E3E3' } = {}) {
   const ln = `<a:lnL w="0"><a:noFill/></a:lnL><a:lnR w="0"><a:noFill/></a:lnR><a:lnT w="0"><a:noFill/></a:lnT><a:lnB w="6350"><a:solidFill><a:srgbClr val="${bottom}"/></a:solidFill></a:lnB>`;
   const f = fill ? `<a:solidFill><a:srgbClr val="${fill}"/></a:solidFill>` : '<a:noFill/>';
-  const p = text === '' ? `<a:p><a:pPr algn="${algn}"/><a:endParaRPr lang="pt-BR" sz="${sz}" dirty="0"/></a:p>` : `<a:p><a:pPr algn="${algn}"/>${run(text, { sz, b, color, font: FONT })}</a:p>`;
+  const p = text === '' ? `<a:p><a:pPr algn="${algn}"/><a:endParaRPr lang="pt-BR" sz="${sz}" dirty="0"/></a:p>`
+    : String(text).split('\n').map((t, i) => `<a:p><a:pPr algn="${algn}"/>${run(t, { sz: i ? Math.round(sz * 0.8) : sz, b: i ? false : b, color, font: FONT })}</a:p>`).join('');
   return `<a:tc><a:txBody><a:bodyPr/><a:lstStyle/>${p}</a:txBody><a:tcPr marL="54000" marR="54000" marT="14000" marB="14000" anchor="ctr">${ln}${f}</a:tcPr></a:tc>`;
 }
 function rowHeight(text, d) {
@@ -378,54 +379,66 @@ function conclusionSlide(v, defMap) {
   sub.push(para([run(`${versaoLabel(v)} · ${fmtDate(v.endAt || v.startAt)}`, { sz: 1000, color: '6D6E71', font: FONT })], { algn: 'ctr', spcBef: 300 }));
   textBox(s, { x: x0, y: 2450000, w: 2900000, h: 1000000, paras: sub, name: 'Comparação', anchor: 't' });
 
-  // barras por grupo
+  // barras por grupo lógico
   const bx = x0 + 3200000, bw = 5900000;
-  const groups = o.groups.filter((g) => hasContent(g.d, g.g));
+  const groups = o.logical.filter((L) => L.list.some((x) => hasContent(x.d, x.g)));
   const step = Math.min(850000, 2500000 / Math.max(1, groups.length));
   groups.forEach((g, i) => {
     const y = 1000000 + i * step;
-    const pg = v.prev?.groups?.[g.d.id];
-    const head = [run(g.d.grupo, { sz: 1300, b: true, color: GREY, font: FONT }), run(`   ${fmtPct(g.pct)}`, { sz: 1300, b: true, color: TEAL, font: FONT })];
-    if (pg) head.push(run(`   (${versaoLabel(v.prev)}: ${fmtPct(pg.pct)}  ${deltaLabel(g.pct, pg.pct)})`, { sz: 1000, color: '6D6E71', font: FONT }));
-    textBox(s, { x: bx, y, w: bw, h: 300000, paras: [para(head)], name: 'Grupo ' + g.d.grupo, anchor: 'ctr' });
+    const pp = v.prev ? (v.prev.logical?.[g.id] ?? v.prev.groups?.[g.id]?.pct) : undefined;
+    const head = [run(g.nome, { sz: 1300, b: true, color: GREY, font: FONT }), run(`   ${fmtPct(g.pct)}`, { sz: 1300, b: true, color: TEAL, font: FONT })];
+    if (v.prev && pp !== undefined) head.push(run(`   (${versaoLabel(v.prev)}: ${fmtPct(pp)}  ${deltaLabel(g.pct, pp)})`, { sz: 1000, color: '6D6E71', font: FONT }));
+    textBox(s, { x: bx, y, w: bw, h: 300000, paras: [para(head)], name: 'Grupo ' + g.nome, anchor: 'ctr' });
     rectShape(s, { x: bx + 75600, y: y + 320000, w: bw - 150000, h: 190000, fill: 'E3E3E3', round: 50000, name: 'Trilho' });
     const fw = Math.round((bw - 150000) * Math.max(0, Math.min(100, g.pct ?? 0)) / 100);
     if (fw > 0) rectShape(s, { x: bx + 75600, y: y + 320000, w: Math.max(fw, 120000), h: 190000, fill: (g.pct ?? 0) >= 100 ? '2E9D52' : TEAL, round: 50000, name: 'Avanço' });
-    if (pg && pg.pct != null) rectShape(s, { x: bx + 75600 + Math.round((bw - 150000) * pg.pct / 100) - 9000, y: y + 290000, w: 18000, h: 250000, fill: 'F58220', name: 'Marcador anterior' });
+    if (pp != null) rectShape(s, { x: bx + 75600 + Math.round((bw - 150000) * pp / 100) - 9000, y: y + 290000, w: 18000, h: 250000, fill: 'F58220', name: 'Marcador anterior' });
   });
   if (v.prev) textBox(s, { x: bx, y: 1000000 + groups.length * step - 120000, w: bw, h: 220000, paras: [para([run(`▏laranja = avanço na ${versaoLabel(v.prev)}`, { sz: 800, color: 'F58220', font: FONT })], { algn: 'r' })], name: 'Legenda' });
   obsBox(s, v.conclusao, { y: 3650000, h: 1800000, big: true });
   return s;
 }
 
+function stripAc(s, runs) {
+  textBox(s, { x: FRAME.x + 100000, y: FRAME.y + 40000, w: FRAME.w - 200000, h: 260000, paras: [para(runs)], name: 'Resumo', anchor: 'ctr' });
+}
+const fmtN = (n) => String(Math.round(n * 100) / 100).replace('.', ',');
+
 function acompGroupSlide(v, def, inst) {
+  if (def.modo === 'quadro') return quadroSlide(v, def, inst);
   const s = new Slide(13);
   const gc = groupCalc(v, def, inst);
-  const pg = v.prev?.groups?.[def.id];
+  const pg = v.prev?.groups?.[instKey(def, inst)];
   titleShape(s, 'Acompanhamento - ' + instTitle(def, inst));
   frameShapes(s);
   const hs = [run('Avanço do grupo: ', { sz: 900, b: true, color: TEAL, font: FONT }), run(fmtPct(gc.pct), { sz: 900, b: true, color: GREY, font: FONT }),
     run(`   (${gc.filled} de ${gc.total} itens preenchidos)`, { sz: 900, color: GREY, font: FONT })];
   if (pg) hs.push(run(`    ${versaoLabel(v.prev)}: ${fmtPct(pg.pct)}  ${deltaLabel(gc.pct, pg.pct)}`, { sz: 900, b: true, color: GREY, font: FONT }));
-  textBox(s, { x: FRAME.x + 100000, y: FRAME.y + 40000, w: FRAME.w - 200000, h: 260000, paras: [para(hs)], name: 'Resumo', anchor: 'ctr' });
+  stripAc(s, hs);
 
   const prev = !!pg;
   const stages = ETAPA_ORDER.filter((e) => def.items.some((it) => it.etapas.includes(e)));
   const SW = stages.length > 3 ? 900000 : 1050000;
-  const rest = prev ? [620000, ...stages.map(() => SW), 800000, 880000, 1250000] : [700000, ...stages.map(() => SW), 920000, 1000000];
+  const rest = prev ? [700000, ...stages.map(() => SW), 800000, 880000, 1250000] : [780000, ...stages.map(() => SW), 920000, 1000000];
   const total = FRAME.w - 200000;
   const colW = [total - rest.reduce((a, b) => a + b, 0), ...rest];
-  const sz = 1200, rowH = 410000;
+  const sz = 1200;
   const H = (t, algn = 'ctr') => cell(t, { sz: 1100, fill: TEAL, color: 'FFFFFF', b: true, algn });
   const rows = [{ h: 360000, cells: [H('Item', 'l'), H('Projeto'), ...stages.map((e) => H(ETAPAS[e])), H('Pendente'), H('Avanço'), ...(prev ? [H(`vs ${versaoLabel(v.prev)}`)] : [])] }];
   for (const { it, c } of gc.items) {
-    const cells = [cell(it.text, { sz, b: true }), cell(c.proj != null ? String(c.proj) : '—', { sz, algn: 'ctr', b: true })];
+    const two = it.metragem;
+    const nome = it.text + (c.precon ? '\n(pré-conectorizado)' : '');
+    const cells = [cell(nome, { sz, b: true }), cell(c.proj != null ? String(c.proj) + (two ? `\n${c.projM != null ? fmtN(c.projM) + ' m' : '—'}` : '') : '—', { sz, algn: 'ctr', b: true })];
     for (const e of stages) {
-      if (!it.etapas.includes(e)) { cells.push(cell('—', { sz, algn: 'ctr', color: 'B5B5B5', fill: 'F7F7F7' })); continue; }
+      if (!c.etapas.includes(e)) { cells.push(cell(e === 'fus' && c.precon ? 'n/a' : '—', { sz, algn: 'ctr', color: 'B5B5B5', fill: 'F7F7F7' })); continue; }
       const val = c.vals[e];
-      if (val == null) { cells.push(cell('–', { sz, algn: 'ctr', color: '939598' })); continue; }
+      const hasM = e === 'inst' && it.metragem && c.instM != null;
+      if (val == null && !hasM) { cells.push(cell('–', { sz, algn: 'ctr', color: '939598' })); continue; }
       const l = c.pcts[e] != null ? lvl(c.pcts[e]) : {};
-      cells.push(cell(c.pcts[e] != null ? `${val} · ${c.pcts[e]}%` : String(val), { sz, algn: 'ctr', b: true, fill: l.fill, color: l.color || GREY }));
+      let t = val != null ? String(val) : '—';
+      if (c.pcts[e] != null) t += ` · ${c.pcts[e]}%`;
+      if (hasM) t += `\n${fmtN(c.instM)}${c.projM != null ? ' / ' + fmtN(c.projM) : ''} m`;
+      cells.push(cell(t, { sz, algn: 'ctr', b: true, fill: l.fill, color: l.color || GREY }));
     }
     cells.push(cell(c.pend != null && c.filled ? String(c.pend) : '–', { sz, algn: 'ctr' }));
     const al = c.pct != null ? lvl(c.pct) : {};
@@ -435,11 +448,40 @@ function acompGroupSlide(v, def, inst) {
       const d = c.pct != null && pi?.pct != null ? c.pct - pi.pct : 0;
       cells.push(cell(pi ? `${fmtPct(pi.pct)}  ${dl}`.trim() : '—', { sz: 900, algn: 'ctr', color: d > 0 ? '1E6B34' : d < 0 ? 'B3261E' : GREY, b: !!dl }));
     }
-    rows.push({ h: rowH, cells });
+    rows.push({ h: two || c.precon ? 560000 : 410000, cells });
   }
   tableShape(s, { x: FRAME.x + 100000, y: 1130000, colW, rows });
   const tableEnd = 1130000 + rows.reduce((a, r) => a + r.h, 0);
-  obsBox(s, inst.obs, { y: Math.max(tableEnd + 150000, 3600000), h: 5450000 - Math.max(tableEnd + 150000, 3600000), big: true });
+  const oy = Math.max(tableEnd + 120000, 3600000);
+  obsBox(s, inst.obs, { y: oy, h: 5450000 - oy, big: true });
+  return [s];
+}
+
+function quadroSlide(v, def, inst) {
+  const s = new Slide(13);
+  const q = quadroCalc(inst);
+  const pg = v.prev?.groups?.[instKey(def, inst)];
+  titleShape(s, 'Acompanhamento - ' + instTitle(def, inst));
+  frameShapes(s);
+  const hs = [run('Avanço do quadro: ', { sz: 900, b: true, color: TEAL, font: FONT }), run(fmtPct(q.pct), { sz: 900, b: true, color: GREY, font: FONT }),
+    run(`   Proprietário: ${q.dono || '—'}   ·   Ação: ${q.acao || '—'}`, { sz: 900, color: GREY, font: FONT })];
+  if (pg) hs.push(run(`    ${versaoLabel(v.prev)}: ${fmtPct(pg.pct)}  ${deltaLabel(q.pct, pg.pct)}`, { sz: 900, b: true, color: GREY, font: FONT }));
+  stripAc(s, hs);
+  const prev = !!pg?.quadro;
+  const colW = prev ? [3800000, 2000000, 3600000] : [5600000, 3800000];
+  const sz = 1300, H = (t, a = 'ctr') => cell(t, { sz: 1100, fill: TEAL, color: 'FFFFFF', b: true, algn: a });
+  const rows = [{ h: 360000, cells: [H('Etapa', 'l'), H('Situação'), ...(prev ? [H(`${versaoLabel(v.prev)}`)] : [])] }];
+  for (const [k, lab] of QUADRO_ETAPAS) {
+    const ok = !!inst.quadro?.[k];
+    const cells = [cell(lab, { sz, b: true }), cell(ok ? '✔ Sim' : 'Pendente', { sz, algn: 'ctr', b: ok, fill: ok ? 'DDF1E3' : undefined, color: ok ? '1E6B34' : '939598' })];
+    if (prev) { const was = !!pg.quadro.flags?.[k]; cells.push(cell(was ? '✔ Sim' : 'Pendente', { sz: 1100, algn: 'ctr', color: was ? '1E6B34' : '939598' })); }
+    rows.push({ h: 400000, cells });
+  }
+  const cab = q.cabos != null ? `${fmtN(q.cabos)} ${q.unid === 'm' ? 'm' : q.cabos === 1 ? 'unidade' : 'unidades'}` : '—';
+  rows.push({ h: 400000, cells: [cell('Cabos instalados', { sz, b: true }), cell(cab, { sz, algn: 'ctr', b: true }), ...(prev ? [cell(pg.quadro.cabos != null ? `${fmtN(pg.quadro.cabos)} ${pg.quadro.unid === 'm' ? 'm' : 'un'}` : '—', { sz: 1100, algn: 'ctr', color: GREY })] : [])] });
+  tableShape(s, { x: FRAME.x + 100000, y: 1130000, colW, rows });
+  const tableEnd = 1130000 + rows.reduce((a, r) => a + r.h, 0);
+  obsBox(s, inst.obs, { y: tableEnd + 150000, h: 5450000 - tableEnd - 150000, big: true });
   return [s];
 }
 

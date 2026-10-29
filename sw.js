@@ -1,5 +1,5 @@
 // Service worker: guarda o app no aparelho para funcionar sem internet.
-const VERSION = 'v1.4.0';
+const VERSION = 'v1.5.0';
 const CACHE = 'qmc-vistoria-' + VERSION;
 const SHELL = [
   './', 'index.html', 'styles.css', 'config.js', 'manifest.webmanifest',
