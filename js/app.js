@@ -350,7 +350,7 @@ async function viewGroup(gid) {
   renderPhotos();
 }
 // ---- grupo de acompanhamento (instalado x projetado) ----
-const qField = (key, f, label, val, ph = '') => `<label class="qf"><span>${label}</span><input type="number" inputmode="numeric" min="0" step="1" data-q="${E(key)}|${f}" value="${E(val ?? '')}" placeholder="${E(ph)}"></label>`;
+const qField = (key, f, label, val, ph = '', ro = false) => `<label class="qf"><span>${label}${ro ? ' (auto)' : ''}</span><input ${ro ? 'readonly tabindex="-1" style="background:#eef2f4"' : ''} type="number" inputmode="numeric" min="0" step="1" data-q="${E(key)}|${f}" value="${E(val ?? '')}" placeholder="${E(ph)}"></label>`;
 function prevLine(it) {
   const pi = V.prev?.groups?.[instKey(curDef, curInst)]?.items?.[it.key];
   if (!pi) return '';
@@ -367,6 +367,7 @@ function qSubHTML(it, c) {
 function qItemHTML(it, inst) {
   const q = inst.qty?.[it.key] || {};
   const c = itemCalc(V, it, q);
+  const auto = it.key === 'idfs' && curDef.id === 'idf' && instsOf(acompMap.get('idf_det')).some((g) => !g.na);
   const defProj = it.projDe ? V.header[it.projDe] : '';
   const fields = [['proj', it.metragem ? 'Projeto (qtd)' : 'Projeto', defProj !== '' && defProj != null ? String(defProj) : '']];
   if (it.metragem) fields.push(['projM', 'Projeto (m)', '']);
@@ -374,7 +375,7 @@ function qItemHTML(it, inst) {
   return `<div class="qi" data-qi="${E(it.key)}"><div class="qh"><b>${E(it.text)}</b><span class="badge ${c.pct === 100 ? 'done' : 'go'}" data-qpct>${fmtPct(c.pct)}</span></div>
     ${it.dica ? `<div class="hint">💡 ${E(it.dica)}</div>` : ''}${it.key === 'idfs' && curDef.id === 'idf' ? idfResumo() : ''}
     ${it.preconect ? `<label class="qchk"><input type="checkbox" data-qchk="${E(it.key)}|precon" ${q.precon ? 'checked' : ''}> Pré-conectorizado (não precisa de fusão)</label>` : ''}
-    <div class="qgrid">${fields.map(([f, l, ph]) => qField(it.key, f, l, q[f], ph)).join('')}</div>
+    <div class="qgrid">${fields.map(([f, l, ph]) => qField(it.key, f, l, q[f], ph, auto && (f === 'inst' || f === 'energ'))).join('')}</div>
     <div class="qs" data-qsub>${qSubHTML(it, c)}</div>${prevLine(it)}</div>`;
 }
 function refreshQItem(key) {
@@ -388,7 +389,16 @@ function idfFlagsHTML(inst) {
   const q = inst.quadro ||= {};
   const tg = (k, l) => `<label class="tg ${q[k] ? 'on' : ''}"><input type="checkbox" data-qflag="${k}" ${q[k] ? 'checked' : ''}><span>${l}</span></label>`;
   return `<div class="card"><h2>Situação deste IDF</h2><div class="tgs" style="grid-template-columns:repeat(2,1fr)">${tg('inst', 'IDF instalado')}${tg('energ', 'IDF energizado')}</div>
-    <p class="muted">Marque aqui qual IDF já está instalado / energizado. O resumo aparece no item "IDFs" do grupo IDF.</p></div>`;
+    <p class="muted">Marque aqui qual IDF já está instalado / energizado. O grupo IDF conta isso automaticamente.</p></div>`;
+}
+// quantidade de IDFs instalados/energizados = contagem dos subgrupos (evita divergência)
+function syncIdfs(v = V) {
+  if (v.tipo !== 'acomp') return;
+  const idf = v.groups.find((g) => g.groupId === 'idf'); if (!idf) return;
+  const l = v.groups.filter((g) => g.groupId === 'idf_det' && !g.na); if (!l.length) return;
+  const o = ((idf.qty ||= {}).idfs ||= {});
+  const a = String(l.filter((g) => g.quadro?.inst).length), b = String(l.filter((g) => g.quadro?.energ).length);
+  if (o.inst !== a || o.energ !== b) { o.inst = a; o.energ = b; }
 }
 function idfResumo() {
   const l = instsOf(acompMap.get('idf_det')).filter((g) => !g.na);
@@ -673,7 +683,7 @@ async function onClick(e) {
     if (label === null) return;
     const ni = newInst(d, label);
     if (d.modo === 'quadro') ni.quadro = { dono: acompCfg.proprietarios_quadro[0], acao: 'Instalar', unid: 'un' };
-    V.groups.push(ni); touch(); refreshOverviewBits();
+    V.groups.push(ni); syncIdfs(); touch(); refreshOverviewBits();
     if (d.tipo === 'acomp') location.hash = `#/v/${V.id}/g/${ni.gid}`;
     return;
   }
@@ -715,7 +725,7 @@ async function onClick(e) {
     case 'rmgrp': {
       if (!confirm(`Remover "${instTitle(curDef, curInst)}" e suas fotos?`)) break;
       for (const p of curInst.photos) await removePhoto(p.id);
-      V.groups = V.groups.filter((g) => g.gid !== curInst.gid); touch(); location.hash = `#/v/${V.id}`; break;
+      V.groups = V.groups.filter((g) => g.gid !== curInst.gid); syncIdfs(); touch(); location.hash = `#/v/${V.id}`; break;
     }
     case 'install': deferredInstall?.prompt(); deferredInstall = null; route(); break;
     case 'login': toast('Abrindo login da Microsoft…', 4000); cloud.signIn().catch((e) => toast('Erro no login: ' + (e.errorCode ? e.errorCode + ' – ' : '') + (e.message || e), 12000)); break;
@@ -762,9 +772,9 @@ view.addEventListener('input', (e) => {
 });
 view.addEventListener('change', async (e) => {
   const t = e.target;
-  if (t.id === 'naChk') { curInst.na = t.checked; $('#body').hidden = t.checked; touch(); }
+  if (t.id === 'naChk') { curInst.na = t.checked; $('#body').hidden = t.checked; syncIdfs(); touch(); }
   else if (t.dataset.qd) { (curInst.quadro ||= {})[t.dataset.qd] = t.value; touch(); updateAcompGroup(); }
-  else if (t.dataset.qflag) { (curInst.quadro ||= {})[t.dataset.qflag] = t.checked; t.closest('.tg').classList.toggle('on', t.checked); touch(); updateAcompGroup(); }
+  else if (t.dataset.qflag) { (curInst.quadro ||= {})[t.dataset.qflag] = t.checked; t.closest('.tg').classList.toggle('on', t.checked); syncIdfs(); touch(); updateAcompGroup(); }
   else if (t.dataset.qchk) {
     const [k, f] = t.dataset.qchk.split('|'); const o = ((curInst.qty ||= {})[k] ||= {});
     if (t.checked) o[f] = true; else delete o[f];
@@ -798,6 +808,7 @@ async function route() {
   if (!V || V.id !== r.id) V = await db.getVistoria(r.id);
   if (!V) { location.hash = '#/'; return; }
   if (migrateAcomp(V)) db.putVistoria(V);
+  syncIdfs();
   if (r.v === 'vistoria') return viewVistoria();
   if (r.v === 'group') return viewGroup(r.gid);
   if (r.v === 'finish') return viewFinish();
