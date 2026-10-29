@@ -267,6 +267,7 @@ function grpRow(d, inst) {
   const ph = inst.photos.length;
   const prevG = V.prev?.groups?.[instKey(d, inst)];
   const info = d.modo === 'quadro' ? `${inst.quadro?.dono || '—'} · ${inst.quadro?.acao || ''} · avanço ${fmtPct(p.avanco)}${prevG ? ` (ant. ${fmtPct(prevG.pct)})` : ''}`
+    : d.id === 'idf_det' ? `${inst.quadro?.inst ? 'instalado' : 'não instalado'} · ${inst.quadro?.energ ? 'energizado' : 'não energizado'} · avanço ${fmtPct(p.avanco)}${prevG ? ` (ant. ${fmtPct(prevG.pct)})` : ''}`
     : d.tipo === 'acomp' ? `avanço ${fmtPct(p.avanco)}${prevG ? ` (ant. ${fmtPct(prevG.pct)})` : ''} · ${p.done}/${p.total} itens` : `${p.done}/${p.total}`;
   return `<a class="grp ${inst.na ? 'na' : ''}" href="#/v/${V.id}/g/${inst.gid}"><div class="grow"><div class="t">${E(instTitle(d, inst))}</div>
     <div class="s">${inst.na ? 'Não se aplica' : `${info} · ${ph} foto${ph === 1 ? '' : 's'}`}${needsPhoto(d, inst) ? ' · <b style="color:var(--nok)">foto obrigatória</b>' : ''}</div>
@@ -371,7 +372,7 @@ function qItemHTML(it, inst) {
   if (it.metragem) fields.push(['projM', 'Projeto (m)', '']);
   for (const e of c.etapas) { fields.push([e, ETAPAS[e] + (it.metragem && e === 'inst' ? ' (qtd)' : ''), '']); if (it.metragem && e === 'inst') fields.push(['instM', 'Instalado (m)', '']); }
   return `<div class="qi" data-qi="${E(it.key)}"><div class="qh"><b>${E(it.text)}</b><span class="badge ${c.pct === 100 ? 'done' : 'go'}" data-qpct>${fmtPct(c.pct)}</span></div>
-    ${it.dica ? `<div class="hint">💡 ${E(it.dica)}</div>` : ''}
+    ${it.dica ? `<div class="hint">💡 ${E(it.dica)}</div>` : ''}${it.key === 'idfs' && curDef.id === 'idf' ? idfResumo() : ''}
     ${it.preconect ? `<label class="qchk"><input type="checkbox" data-qchk="${E(it.key)}|precon" ${q.precon ? 'checked' : ''}> Pré-conectorizado (não precisa de fusão)</label>` : ''}
     <div class="qgrid">${fields.map(([f, l, ph]) => qField(it.key, f, l, q[f], ph)).join('')}</div>
     <div class="qs" data-qsub>${qSubHTML(it, c)}</div>${prevLine(it)}</div>`;
@@ -382,6 +383,20 @@ function refreshQItem(key) {
   const c = itemCalc(V, it, curInst.qty?.[key]);
   const b = box.querySelector('[data-qpct]'); b.textContent = fmtPct(c.pct); b.className = 'badge ' + (c.pct === 100 ? 'done' : 'go');
   box.querySelector('[data-qsub]').innerHTML = qSubHTML(it, c);
+}
+function idfFlagsHTML(inst) {
+  const q = inst.quadro ||= {};
+  const tg = (k, l) => `<label class="tg ${q[k] ? 'on' : ''}"><input type="checkbox" data-qflag="${k}" ${q[k] ? 'checked' : ''}><span>${l}</span></label>`;
+  return `<div class="card"><h2>Situação deste IDF</h2><div class="tgs" style="grid-template-columns:repeat(2,1fr)">${tg('inst', 'IDF instalado')}${tg('energ', 'IDF energizado')}</div>
+    <p class="muted">Marque aqui qual IDF já está instalado / energizado. O resumo aparece no item "IDFs" do grupo IDF.</p></div>`;
+}
+function idfResumo() {
+  const l = instsOf(acompMap.get('idf_det')).filter((g) => !g.na);
+  if (!l.length) return '';
+  const nm = (k) => l.filter((g) => g.quadro?.[k]).map((g) => g.label || 'IDF');
+  const fal = (k) => l.filter((g) => !g.quadro?.[k]).map((g) => g.label || 'IDF');
+  const lin = (t, k) => `${t}: <b>${nm(k).length}/${l.length}</b>${fal(k).length ? ` · faltam ${E(fal(k).join(', '))}` : ''}`;
+  return `<div class="hint">Pelos subgrupos — ${lin('instalados', 'inst')} | ${lin('energizados', 'energ')}</div>`;
 }
 function quadroHTML(inst) {
   const q = inst.quadro ||= { dono: acompCfg.proprietarios_quadro[0], acao: 'Instalar', unid: 'un' };
@@ -413,6 +428,7 @@ function viewGroupAcomp(inst, d) {
     <label class="row" style="gap:8px;font-size:14px"><input type="checkbox" id="naChk" ${inst.na ? 'checked' : ''} style="width:20px;height:20px"> Não se aplica</label>
   </div>
   <div id="body" ${inst.na ? 'hidden' : ''}>
+    ${d.id === 'idf_det' ? idfFlagsHTML(inst) : ''}
     ${d.modo === 'quadro' ? quadroHTML(inst) : `<div class="card"><h2>Quantidades</h2>
       <p class="muted" style="margin-top:-4px">Informe o <b>projeto</b> e quanto já foi <b>instalado / fusionado / conectado</b>. O avanço é calculado automaticamente.</p>
       <div id="items">${d.items.map((it) => qItemHTML(it, inst)).join('')}</div></div>`}

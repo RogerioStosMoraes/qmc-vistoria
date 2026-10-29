@@ -413,6 +413,7 @@ function acompGroupSlide(v, def, inst) {
   frameShapes(s);
   const hs = [run('Avanço do grupo: ', { sz: 900, b: true, color: TEAL, font: FONT }), run(fmtPct(gc.pct), { sz: 900, b: true, color: GREY, font: FONT }),
     run(`   (${gc.filled} de ${gc.total} itens preenchidos)`, { sz: 900, color: GREY, font: FONT })];
+  if (def.id === 'idf_det') hs.push(run(`   ·   ${inst.quadro?.inst ? 'Instalado' : 'Não instalado'}  ·  ${inst.quadro?.energ ? 'Energizado' : 'Não energizado'}`, { sz: 900, b: true, color: TEAL, font: FONT }));
   if (pg) hs.push(run(`    ${versaoLabel(v.prev)}: ${fmtPct(pg.pct)}  ${deltaLabel(gc.pct, pg.pct)}`, { sz: 900, b: true, color: GREY, font: FONT }));
   stripAc(s, hs);
 
