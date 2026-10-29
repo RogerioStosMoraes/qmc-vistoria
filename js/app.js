@@ -164,7 +164,7 @@ function overall(v = V) {
 }
 
 // ---------- layout (barra superior) ----------
-const APP_VERSION = '1.5.0'; // manter igual ao VERSION de sw.js
+const APP_VERSION = '1.5.1'; // manter igual ao VERSION de sw.js
 function setTop({ back, title, right = '' }) {
   $('#top').innerHTML = (back ? `<a class="icon-btn" href="${back}" aria-label="Voltar" style="text-decoration:none;display:grid;place-items:center">←</a>` : `<img src="assets/qmc-logo.png" alt="QMC">`) + `<h1>${E(title)}</h1><span class="ver">v${APP_VERSION}</span>${right}`;
 }
@@ -826,7 +826,11 @@ window.addEventListener('online', () => doSync(false));
     defs = expandAll(checklist); defMap = new Map(defs.map((d) => [d.id, d]));
     acompCfg = await (await fetch(TIPOS.acomp.arquivo)).json();
     acompDefs = expandAcomp(acompCfg); acompMap = new Map(acompDefs.map((d) => [d.id, d]));
-    if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js').catch((e) => console.warn('SW', e));
+    if ('serviceWorker' in navigator) {
+      const had = !!navigator.serviceWorker.controller; // nova versão assume -> recarrega uma vez
+      navigator.serviceWorker.addEventListener('controllerchange', () => { if (had && !window.__rl) { window.__rl = 1; flush().finally(() => location.reload()); } });
+      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' }).then((r) => r.update()).catch((e) => console.warn('SW', e));
+    }
     try { await cloud.initAuth(); } catch (e) { toast('Erro no login Microsoft: ' + (e.message || e), 6000); }
     await route();
     if (cloud.user() && navigator.onLine) doSync(false);
