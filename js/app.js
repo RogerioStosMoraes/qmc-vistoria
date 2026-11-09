@@ -164,7 +164,7 @@ function overall(v = V) {
 }
 
 // ---------- layout (barra superior) ----------
-const APP_VERSION = '1.6.2'; // manter igual ao VERSION de sw.js
+const APP_VERSION = '1.6.3'; // manter igual ao VERSION de sw.js
 function setTop({ back, title, right = '' }) {
   $('#top').innerHTML = (back ? `<a class="icon-btn" href="${back}" aria-label="Voltar" style="text-decoration:none;display:grid;place-items:center">←</a>` : `<img src="assets/qmc-logo.png" alt="QMC">`) + `<h1>${E(title)}</h1><span class="ver">v${APP_VERSION}</span>${right}`;
 }
@@ -200,7 +200,7 @@ function vItem(v) {
   const pct = isAcomp(v) ? overall(v).pct : (() => { let t = 0, d0 = 0; for (const g of v.groups || []) { if (g.na) continue; const p = progressOf(defMap.get(g.groupId), g, v); d0 += p.done; t += p.total; } return t ? Math.round((d0 / t) * 100) : 0; })();
   const tipoBadge = `<span class="badge tipo">${isAcomp(v) ? 'Acomp. ' + versaoLabel(v) : 'Pré-HOF'}</span>`;
   const sync = !cloud.user() ? '' : (v.dirty ? '<span class="badge warn">não enviada</span>' : '<span class="badge sync">☁ ok</span>');
-  return `<a class="item" href="#/v/${v.id}"><div class="grow"><div class="t">${E(h.empreendimento || 'Sem nome')}</div><div class="s">${E(h.siteId || 'sem ID')} · ${fmtDate(v.startAt)} ${fmtTime(v.startAt)} · ${isAcomp(v) ? 'avanço ' : ''}${pct}%</div></div>${tipoBadge}${sync}<span class="badge ${done ? 'done' : 'go'}">${done ? 'Finalizada' : 'Em andamento'}</span></a>`;
+  return `<a class="item" href="#/v/${v.id}"><div class="grow"><div class="t">${E(h.empreendimento || 'Sem nome')}</div><div class="s">${E(h.siteId || 'sem ID')} · ${fmtDate(v.startAt)} ${fmtTime(v.startAt)} · ${isAcomp(v) ? 'avanço ' : ''}${pct}% · 📷 ${(v.groups || []).reduce((n, g) => n + (g.photos?.length || 0), 0)}</div></div>${tipoBadge}${sync}<span class="badge ${done ? 'done' : 'go'}">${done ? 'Finalizada' : 'Em andamento'}</span></a>`;
 }
 
 // ---------- ONEDRIVE: escolher / forçar download ----------
