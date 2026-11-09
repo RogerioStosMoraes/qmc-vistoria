@@ -636,12 +636,6 @@
      "item": "Canalização identificada"
     },
     {
-     "item": "miniQDCA instalado conforme projeto"
-    },
-    {
-     "item": "Conectores dos cabos elétricos corretamente feitos"
-    },
-    {
      "item": "miniDIO montado conforme projeto"
     },
     {
@@ -684,9 +678,6 @@
      "item": "Remotas sem alarmes"
     },
     {
-     "item": "Energia para remotas instalada corretamente"
-    },
-    {
      "item": "Identificação dos jumpers óticos entre miniDIO e remotas"
     },
     {
@@ -703,48 +694,6 @@
     },
     {
      "item": "Remotas identificadas"
-    }
-   ],
-   "campos": [
-    {
-     "campo": "Amperagem do DJG",
-     "tipo": "numero_A",
-     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
-    },
-    {
-     "campo": "Amperagem DJ Remota 1",
-     "tipo": "numero_A",
-     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
-    },
-    {
-     "campo": "Amperagem DJ Remota 2",
-     "tipo": "numero_A",
-     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
-    },
-    {
-     "campo": "Amperagem DJ Remota 3",
-     "tipo": "numero_A",
-     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
-    },
-    {
-     "campo": "Amperagem DJ Régua 1",
-     "tipo": "numero_A",
-     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
-    },
-    {
-     "campo": "Amperagem DJ Régua 2",
-     "tipo": "numero_A",
-     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
-    },
-    {
-     "campo": "Amperagem DJ Tomada",
-     "tipo": "numero_A",
-     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
-    },
-    {
-     "campo": "Amperagem DJ Reserva",
-     "tipo": "numero_A",
-     "anexo_obrigatorio_se": "Se valor do DJ difere do projeto, anexar print de conformidade da engenharia QMC"
     }
    ]
   },
