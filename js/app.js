@@ -60,14 +60,14 @@ async function doSync(manual) {
   syncing = true; setSyncBtn(true);
   try {
     await flush();
-    const r = await cloud.syncAll();
+    const r = await cloud.syncAll((t) => setSyncBtn(true, t));
     if (V) { const fresh = await db.getVistoria(V.id); if (fresh && !V.dirty) V = fresh; }
     if (manual || r.pulled) toast(`Sincronizado: ${r.pushed} enviada(s), ${r.pulled} recebida(s)`);
     if (location.hash === '' || location.hash === '#/') route();
   } catch (e) { console.error(e); if (manual) toast('Falha ao sincronizar: ' + e.message, 5000); }
   finally { syncing = false; setSyncBtn(false); }
 }
-function setSyncBtn(on) { const b = $('[data-act=sync]'); if (b) { b.disabled = on; b.textContent = on ? '⟳ …' : '⟳'; } }
+function setSyncBtn(on, t) { const b = $('[data-act=sync]'); if (b) { b.disabled = on; b.textContent = on ? '⟳ …' : '⟳'; if (t) b.title = t; } }
 
 function photoURL(id) {
   if (urls.has(id)) return Promise.resolve(urls.get(id));
@@ -164,7 +164,7 @@ function overall(v = V) {
 }
 
 // ---------- layout (barra superior) ----------
-const APP_VERSION = '1.5.1'; // manter igual ao VERSION de sw.js
+const APP_VERSION = '1.6.0'; // manter igual ao VERSION de sw.js
 function setTop({ back, title, right = '' }) {
   $('#top').innerHTML = (back ? `<a class="icon-btn" href="${back}" aria-label="Voltar" style="text-decoration:none;display:grid;place-items:center">←</a>` : `<img src="assets/qmc-logo.png" alt="QMC">`) + `<h1>${E(title)}</h1><span class="ver">v${APP_VERSION}</span>${right}`;
 }
@@ -191,6 +191,7 @@ async function viewHome() {
       <button class="btn primary grow" data-act="new" data-tipo="acomp">＋ Acompanhamento</button>
       ${deferredInstall ? `<button class="btn ghost" data-act="install">Instalar app</button>` : ''}
     </div>
+    ${u ? `<div class="row" style="margin:-4px 0 14px"><a class="btn ghost grow" style="text-decoration:none;text-align:center" href="#/nuvem">☁ Abrir vistorias do OneDrive</a></div>` : ''}
     ${list.length ? `<div class="card vlist">${list.map(vItem).join('')}</div>` : `<div class="empty">Nenhuma vistoria ainda.<br>Toque em “Pré-HOF” ou “Acompanhamento” para começar.</div>`}`;
 }
 function vItem(v) {
@@ -200,6 +201,46 @@ function vItem(v) {
   const tipoBadge = `<span class="badge tipo">${isAcomp(v) ? 'Acomp. ' + versaoLabel(v) : 'Pré-HOF'}</span>`;
   const sync = !cloud.user() ? '' : (v.dirty ? '<span class="badge warn">não enviada</span>' : '<span class="badge sync">☁ ok</span>');
   return `<a class="item" href="#/v/${v.id}"><div class="grow"><div class="t">${E(h.empreendimento || 'Sem nome')}</div><div class="s">${E(h.siteId || 'sem ID')} · ${fmtDate(v.startAt)} ${fmtTime(v.startAt)} · ${isAcomp(v) ? 'avanço ' : ''}${pct}%</div></div>${tipoBadge}${sync}<span class="badge ${done ? 'done' : 'go'}">${done ? 'Finalizada' : 'Em andamento'}</span></a>`;
+}
+
+// ---------- ONEDRIVE: escolher / forçar download ----------
+let nuvemList = [], nuvemQ = '';
+const id6Of = (name) => (name.split(' - ').pop() || '').trim();
+async function viewNuvem() {
+  setTop({ back: '#/', title: 'Vistorias no OneDrive', right: '' });
+  if (!cloud.user()) { view.innerHTML = '<div class="warnbox">Entre com sua conta Microsoft primeiro.</div>'; return; }
+  view.innerHTML = '<div class="empty">Buscando no OneDrive…</div>';
+  if (!navigator.onLine) { view.innerHTML = '<div class="warnbox">Sem internet.</div>'; return; }
+  try { nuvemList = await cloud.listRemote(); } catch (e) { view.innerHTML = `<div class="warnbox">Falha ao listar: ${E(e.message)}</div>`; return; }
+  nuvemQ = ''; drawNuvem();
+}
+async function drawNuvem() {
+  const loc = await db.listVistorias();
+  const have = new Map(loc.map((v) => [v.id.slice(0, 6), v]));
+  const q = nuvemQ.toLowerCase();
+  const rows = nuvemList.filter((x) => x.name.toLowerCase().includes(q));
+  const novas = nuvemList.filter((x) => !have.has(id6Of(x.name))).length;
+  const row = (x) => { const l = have.get(id6Of(x.name)); const dt = x.modified ? new Date(x.modified).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' }) : '';
+    return `<div class="vi" style="cursor:default"><div class="grow"><b>${E(x.name)}</b><div class="muted">${dt}</div></div>${l ? '<span class="badge sync">no aparelho</span>' : '<span class="badge warn">não baixada</span>'}<button class="btn ${l ? 'ghost' : 'primary'} small" data-act="pullone" data-folder="${E(x.name)}">${l ? 'Atualizar' : 'Baixar'}</button></div>`; };
+  view.innerHTML = `<div class="card"><input type="search" id="nuvemQ" placeholder="Filtrar por site, empreendimento…" value="${E(nuvemQ)}" style="width:100%;padding:10px;border:1px solid #cfd6dc;border-radius:8px;font-size:16px">
+    <p class="muted" style="margin:8px 0 0">${nuvemList.length} no OneDrive · ${novas} ainda não baixada(s)</p>
+    <div class="row" style="margin-top:10px"><button class="btn primary grow" data-act="pullall" ${novas ? '' : 'disabled'}>Baixar todas as novas</button><button class="btn ghost" data-act="pullforce">Forçar tudo</button></div>
+    <div id="nuvemSt" class="muted" style="margin-top:8px"></div></div>
+    <div class="card vlist">${rows.length ? rows.map(row).join('') : '<div class="empty">Nada encontrado.</div>'}</div>`;
+  const inp = $('#nuvemQ'); if (inp) inp.oninput = () => { nuvemQ = inp.value; const pos = inp.selectionStart; drawNuvem().then(() => { const n = $('#nuvemQ'); n.focus(); n.setSelectionRange(pos, pos); }); };
+}
+async function nuvemPull(folders, open) {
+  const st = $('#nuvemSt'); let ok = 0, fail = 0;
+  for (const [i, f] of folders.entries()) {
+    try {
+      const local = (await db.listVistorias()).find((v) => v.id.slice(0, 6) === id6Of(f));
+      if (local?.dirty) { if (st) st.textContent = `Pulando ${f}: há alterações não enviadas`; continue; }
+      const v = await cloud.pullOne(f, (d, t) => { if (st) st.textContent = `(${i + 1}/${folders.length}) ${f} — fotos ${d}/${t}`; });
+      ok++; if (open) { location.hash = `#/v/${v.id}`; return; }
+    } catch (e) { fail++; console.warn(e); if (st) st.textContent = `Falha em ${f}: ${e.message}`; }
+  }
+  toast(`${ok} baixada(s)${fail ? `, ${fail} com falha` : ''}`);
+  drawNuvem();
 }
 
 // ---------- VISTORIA (visão geral) ----------
@@ -731,6 +772,9 @@ async function onClick(e) {
     case 'login': toast('Abrindo login da Microsoft…', 4000); cloud.signIn().catch((e) => toast('Erro no login: ' + (e.errorCode ? e.errorCode + ' – ' : '') + (e.message || e), 12000)); break;
     case 'logout': if (confirm('Sair da conta Microsoft? As vistorias continuam no aparelho.')) cloud.signOut(); break;
     case 'sync': doSync(true); break;
+    case 'pullone': nuvemPull([t.closest('[data-act]').dataset.folder], true); break;
+    case 'pullall': { const loc = await db.listVistorias(); const ids = new Set(loc.map((v) => v.id.slice(0, 6))); nuvemPull(nuvemList.filter((x) => !ids.has(id6Of(x.name))).map((x) => x.name), false); break; }
+    case 'pullforce': if (confirm('Baixar de novo TODAS as vistorias do OneDrive? (as que têm alterações não enviadas são mantidas)')) nuvemPull(nuvemList.map((x) => x.name), false); break;
     case 'gps': { toast('Obtendo localização…', 1500); const g = await getGPS(); if (g) { V.gps = g; touch(); refreshOverviewBits(); toast('Localização atualizada'); } else toast('Não foi possível obter a localização'); break; }
     case 'rmcover': if (V.cover) { await removePhoto(V.cover.id); V.cover = null; touch(); viewVistoria(); } break;
     case 'allok':
@@ -797,6 +841,7 @@ view.addEventListener('change', async (e) => {
 function parse() {
   const p = location.hash.replace(/^#\/?/, '').split('/');
   if (p[0] === 'v' && p[1]) { if (p[2] === 'g' && p[3]) return { v: 'group', id: p[1], gid: p[3] }; if (p[2] === 'fim') return { v: 'finish', id: p[1] }; return { v: 'vistoria', id: p[1] }; }
+  if (p[0] === 'nuvem') return { v: 'nuvem' };
   return { v: 'home' };
 }
 async function route() {
@@ -805,6 +850,7 @@ async function route() {
   window.scrollTo(0, 0);
   curInst = null; curDef = null;
   if (r.v === 'home') return viewHome();
+  if (r.v === 'nuvem') return viewNuvem();
   if (!V || V.id !== r.id) V = await db.getVistoria(r.id);
   if (!V) { location.hash = '#/'; return; }
   if (migrateAcomp(V)) db.putVistoria(V);

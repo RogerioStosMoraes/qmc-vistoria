@@ -22,6 +22,8 @@ Dois tipos de vistoria (botões na tela inicial):
 - "Criar próxima vistoria" gera a v2.0, v3.0… com o cabeçalho já preenchido e compara com a anterior (item, grupo e geral).
 - PPTX: capa (com quantidades de projeto) → **slide de Conclusão** (avanço geral + observação) → por grupo: tabela + fotos.
 
+**Aparelho novo / vistoria que não apareceu:** na tela inicial, "☁ Abrir vistorias do OneDrive" lista tudo que está na sua pasta; toque em Baixar (ou "Baixar todas as novas" / "Forçar tudo"). A sincronização automática também ficou mais rápida (baixa em paralelo).
+
 Nos dois: funciona offline; sincroniza com o OneDrive de quem está logado (cada pessoa vê só as suas).
 Os itens do acompanhamento ficam em `data/acompanhamento.json`.
 

@@ -163,35 +163,66 @@ async function listFolders() {
   }
 }
 
-async function pull(folder, remoteV) {
+async function pmap(items, n, fn) {
+  const out = new Array(items.length); let i = 0;
+  await Promise.all(Array.from({ length: Math.min(n, items.length) }, async () => { while (i < items.length) { const k = i++; out[k] = await fn(items[k], k); } }));
+  return out;
+}
+
+async function pull(folder, remoteV, onProgress) {
   remoteV.remote = folder;
-  for (const id of photoIds(remoteV)) {
-    const have = await db.getPhoto(id);
-    if (have) continue;
-    try {
-      const r = await gfetch(pathOf(folder, 'fotos', id + '.jpg') + ':/content');
-      const blob = await r.blob();
-      await db.putPhoto({ id, vid: remoteV.id, blob, synced: true });
-    } catch (e) { if (e.status !== 404) throw e; }
-  }
+  const ids = photoIds(remoteV); let done = 0;
+  await pmap(ids, 4, async (id) => {
+    if (!(await db.getPhoto(id))) {
+      try {
+        const blob = await (await gfetch(pathOf(folder, 'fotos', id + '.jpg') + ':/content')).blob();
+        await db.putPhoto({ id, vid: remoteV.id, blob, synced: true });
+      } catch (e) { if (e.status !== 404) throw e; }
+    }
+    onProgress?.(++done, ids.length);
+  });
   remoteV.dirty = false;
   await db.putVistoria(remoteV);
 }
 
+/** Lista as pastas de vistorias no OneDrive (rápido: só nomes e datas). */
+export async function listRemote() {
+  try {
+    let url = `/me/drive/root:/${seg(CONFIG.folder)}:/children?$select=name,folder,lastModifiedDateTime&$top=200`;
+    const out = [];
+    while (url) {
+      const r = await (await gfetch(url)).json();
+      for (const x of r.value || []) if (x.folder) out.push({ name: x.name, modified: x.lastModifiedDateTime });
+      url = r['@odata.nextLink'] || null;
+    }
+    return out.sort((a, b) => (b.modified || '').localeCompare(a.modified || ''));
+  } catch (e) { if (e.status === 404) return []; throw e; }
+}
+
+/** Baixa uma vistoria específica (JSON + fotos) e grava no aparelho. */
+export async function pullOne(folder, onProgress) {
+  const remoteV = await (await gfetch(pathOf(folder, 'vistoria.json') + ':/content')).json();
+  await pull(folder, remoteV, onProgress);
+  return remoteV;
+}
+
 /** Sincronização completa: envia o que está pendente e baixa o que veio de outros dispositivos. */
-export async function syncAll() {
+export async function syncAll(onStatus) {
   const report = { pushed: 0, pulled: 0 };
   const local = await db.listVistorias();
   for (const v of local) {
-    if (v.dirty) { await push(v); v.dirty = false; await db.putVistoria(v); report.pushed++; }
+    if (v.dirty) { onStatus?.('Enviando ' + (v.header?.empreendimento || '')); await push(v); v.dirty = false; await db.putVistoria(v); report.pushed++; }
   }
-  const byRemote = new Map((await db.listVistorias()).map((v) => [v.remote, v]));
-  for (const folder of await listFolders()) {
+  const all = await db.listVistorias();
+  const byRemote = new Map(all.map((v) => [v.remote, v]));
+  const folders = await listFolders(); let n = 0;
+  await pmap(folders, 4, async (folder) => {
     let remoteV;
-    try { remoteV = await (await gfetch(pathOf(folder, 'vistoria.json') + ':/content')).json(); } catch (e) { if (e.status === 404) continue; throw e; }
+    try { remoteV = await (await gfetch(pathOf(folder, 'vistoria.json') + ':/content')).json(); } catch (e) { if (e.status === 404) return; throw e; }
+    onStatus?.(`Verificando ${++n}/${folders.length}`);
     const mine = byRemote.get(folder) || (await db.getVistoria(remoteV.id));
     if (!mine || (!mine.dirty && (remoteV.updatedAt || '') > (mine.updatedAt || ''))) { await pull(folder, remoteV); report.pulled++; }
-  }
+  });
   return report;
 }
 
