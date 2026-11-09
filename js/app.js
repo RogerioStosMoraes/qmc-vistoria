@@ -164,7 +164,7 @@ function overall(v = V) {
 }
 
 // ---------- layout (barra superior) ----------
-const APP_VERSION = '1.6.0'; // manter igual ao VERSION de sw.js
+const APP_VERSION = '1.6.1'; // manter igual ao VERSION de sw.js
 function setTop({ back, title, right = '' }) {
   $('#top').innerHTML = (back ? `<a class="icon-btn" href="${back}" aria-label="Voltar" style="text-decoration:none;display:grid;place-items:center">←</a>` : `<img src="assets/qmc-logo.png" alt="QMC">`) + `<h1>${E(title)}</h1><span class="ver">v${APP_VERSION}</span>${right}`;
 }
@@ -378,6 +378,7 @@ async function viewGroup(gid) {
       <div id="xitems">${extrasHTML(inst)}</div>
       <div class="row" style="margin-top:8px"><button class="btn teal small" data-act="addx">＋ Adicionar itens</button></div></div>
     <div class="card"><h2>Observação do grupo</h2><textarea data-obs placeholder="Observações gerais deste grupo (vai no slide do checklist)">${E(inst.obs)}</textarea></div>
+    ${isUnique(d) ? '' : gestaoHTML(d, inst)}
     <div class="card"><h2>Fotos <span class="muted" style="text-transform:none;letter-spacing:0">(2 por slide)</span></h2>
       <div class="row" style="margin-bottom:12px">
         <label class="btn primary small" style="cursor:pointer">📷 Tirar foto<input type="file" accept="image/*" capture="environment" id="camIn" hidden></label>
@@ -449,14 +450,19 @@ function idfResumo() {
   const lin = (t, k) => `${t}: <b>${nm(k).length}/${l.length}</b>${fal(k).length ? ` · faltam ${E(fal(k).join(', '))}` : ''}`;
   return `<div class="hint">Pelos subgrupos — ${lin('instalados', 'inst')} | ${lin('energizados', 'energ')}</div>`;
 }
+function gestaoHTML(d, inst) {
+  const nome = d.tipo === 'acomp' ? (d.modo === 'quadro' ? 'quadro' : 'item') : 'grupo';
+  return `<div class="card"><h2>Nome e exclusão</h2>
+    <label class="f">Identificação deste ${nome}</label><input type="text" data-qlabel value="${E(inst.label)}" placeholder="${E(d.grupo)}" style="width:100%;padding:10px;border:1px solid #cfd6dc;border-radius:8px;font-size:16px;background:#fff">
+    <div class="row" style="margin-top:10px"><button class="btn danger small" data-act="rmgrp">Excluir ${nome}</button></div></div>`;
+}
 function quadroHTML(inst) {
   const q = inst.quadro ||= { dono: acompCfg.proprietarios_quadro[0], acao: 'Instalar', unid: 'un' };
   const pqq = V.prev?.groups?.[instKey(curDef, inst)]?.quadro; const pq = pqq?.flags;
   const opts = [...new Set([...acompCfg.proprietarios_quadro, q.dono].filter(Boolean))];
   const tg = (k, l) => `<label class="tg ${q[k] ? 'on' : ''}"><input type="checkbox" data-qflag="${k}" ${q[k] ? 'checked' : ''}><span>${l}</span>${pq ? `<small>ant.: ${pq[k] ? 'sim' : 'não'}</small>` : ''}</label>`;
   return `<div class="card"><h2>Quadro elétrico</h2>
-    <label class="f">Identificação</label><input type="text" data-qlabel value="${E(inst.label)}">
-    <div class="qgrid" style="margin-top:10px">
+    <div class="qgrid">
       <label class="qf"><span>De quem é o quadro</span><select data-qd="dono">${opts.map((o) => `<option ${o === q.dono ? 'selected' : ''}>${E(o)}</option>`).join('')}</select></label>
       <label class="qf"><span>Ação</span><select data-qd="acao">${['Instalar', 'Substituir'].map((o) => `<option ${o === q.acao ? 'selected' : ''}>${o}</option>`).join('')}</select></label></div>
     <div class="tgs">${tg('inst', 'Instalado')}${tg('conec', 'Conectado')}${tg('energ', 'Energizado')}</div></div>
@@ -492,7 +498,7 @@ function viewGroupAcomp(inst, d) {
       <div class="photos" id="photos"></div>
     </div>
   </div>
-  ${d.multi ? `<div class="card"><button class="btn danger small" data-act="rmgrp">Remover ${E(d.modo === 'quadro' ? 'este quadro' : 'este item')}</button></div>` : ''}
+  ${d.multi ? gestaoHTML(d, inst) : ''}
   <div class="sticky"><a class="btn teal" style="text-decoration:none;text-align:center;display:block;padding-top:14px" href="#/v/${V.id}">Concluir grupo ✓</a></div>`;
   updateAcompGroup();
   renderPhotos();
@@ -764,7 +770,7 @@ async function onClick(e) {
     }
     case 'nextver': nextVersion(); break;
     case 'rmgrp': {
-      if (!confirm(`Remover "${instTitle(curDef, curInst)}" e suas fotos?`)) break;
+      if (!confirm(`Excluir "${instTitle(curDef, curInst)}" e suas fotos? Não dá para desfazer.`)) break;
       for (const p of curInst.photos) await removePhoto(p.id);
       V.groups = V.groups.filter((g) => g.gid !== curInst.gid); syncIdfs(); touch(); location.hash = `#/v/${V.id}`; break;
     }
